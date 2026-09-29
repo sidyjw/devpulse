@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/sidiney/pm-mcp/internal/ui"
 )
 
 // genericHarness covers any client not in the registry. Without --config it
@@ -32,15 +34,16 @@ func (g genericApp) Install(_ context.Context, _ *Env, t Target, s Spec, o Opts)
 	if t.Path != "" {
 		return fileInstall(g, t, s, o)
 	}
-	fmt.Fprintln(o.Out, "\nJSON (Claude, Cursor, Windsurf, Gemini CLI e a maioria dos clientes):")
+	c := ui.For(o.Out)
+	fmt.Fprintln(o.Out, "\n"+c.BoldCyan("JSON")+c.Dim(" (Claude, Cursor, Windsurf, Gemini CLI e a maioria dos clientes):"))
 	fmt.Fprintln(o.Out, snippet(t.Keys, s.Name, g.Entry(s)))
 
 	vs := stdEntry(s)
 	vs["type"] = "stdio"
-	fmt.Fprintln(o.Out, "\nVS Code (mcp.json):")
+	fmt.Fprintln(o.Out, "\n"+c.BoldCyan("VS Code")+c.Dim(" (mcp.json):"))
 	fmt.Fprintln(o.Out, snippet([]string{"servers"}, s.Name, vs))
 
-	fmt.Fprintln(o.Out, "\nTOML (Codex, ~/.codex/config.toml):")
+	fmt.Fprintln(o.Out, "\n"+c.BoldCyan("TOML")+c.Dim(" (Codex, ~/.codex/config.toml):"))
 	fmt.Fprintf(o.Out, "[mcp_servers.%s]\ncommand = %s\n", tomlKey(s.Name), tomlString(s.Command))
 	if len(s.Args) > 0 {
 		q := make([]string, len(s.Args))
@@ -60,7 +63,7 @@ func (g genericApp) Install(_ context.Context, _ *Env, t Target, s Spec, o Opts)
 
 func (genericApp) Uninstall(_ context.Context, _ *Env, t Target, name string, o Opts) (bool, error) {
 	if t.Path == "" {
-		fmt.Fprintf(o.Out, "  remova a entrada %q da configuração do seu cliente\n", name)
+		o.status("  ! remova a entrada %q da configuração do seu cliente", name)
 		return false, nil
 	}
 	return fileUninstall(t, name, o)

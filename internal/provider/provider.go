@@ -47,6 +47,17 @@ type Setting struct {
 	// SecretAlt is the env var that holds the secret inline, for SecretFile
 	// settings (e.g. "SEVENPACE_TOKEN" for "SEVENPACE_TOKEN_FILE").
 	SecretAlt string
+	// Guide explains where to get the value (optional). For SecretFile
+	// settings it is shown only when the file still has to be created.
+	Guide *Guide
+}
+
+// Guide is a step-by-step explanation shown by the installer. Steps may
+// reference other settings as {ENV} or {ENV|fallback}; the installer fills
+// in what the user has already answered.
+type Guide struct {
+	Title string
+	Steps []string
 }
 
 // Instance is a component built from a configuration.

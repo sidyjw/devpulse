@@ -80,7 +80,7 @@ func (c claudeCode) Install(ctx context.Context, e *Env, t Target, s Spec, o Opt
 	entries, _ := ReadEntries(t.Path, t.Keys)
 	if _, ok := entries[s.Name]; ok {
 		if o.DryRun {
-			fmt.Fprintf(o.Out, "  ~ claude mcp remove %s -s %s (dry-run)\n", s.Name, t.Scope)
+			o.status("  ~ claude mcp remove %s -s %s (dry-run)", s.Name, t.Scope)
 		} else if _, err := e.Run(ctx, Cmd{Name: cli, Args: []string{"mcp", "remove", s.Name, "-s", t.Scope}, Dir: e.Cwd}); err != nil {
 			return fmt.Errorf("claude mcp remove: %w", err)
 		}
@@ -90,13 +90,13 @@ func (c claudeCode) Install(ctx context.Context, e *Env, t Target, s Spec, o Opt
 		return err
 	}
 	if o.DryRun {
-		fmt.Fprintf(o.Out, "  ~ claude mcp add-json %s <json> -s %s (dry-run)\n", s.Name, t.Scope)
+		o.status("  ~ claude mcp add-json %s <json> -s %s (dry-run)", s.Name, t.Scope)
 		return nil
 	}
 	if _, err := e.Run(ctx, Cmd{Name: cli, Args: []string{"mcp", "add-json", s.Name, string(js), "-s", t.Scope}, Dir: e.Cwd}); err != nil {
 		return fmt.Errorf("claude mcp add-json: %w", err)
 	}
-	fmt.Fprintf(o.Out, "  ✓ registrado com `claude mcp add-json` (escopo %s)\n", t.Scope)
+	o.status("  ✓ registrado com `claude mcp add-json` (escopo %s)", t.Scope)
 	return nil
 }
 
@@ -110,13 +110,13 @@ func (c claudeCode) Uninstall(ctx context.Context, e *Env, t Target, name string
 		return false, nil
 	}
 	if o.DryRun {
-		fmt.Fprintf(o.Out, "  ~ claude mcp remove %s -s %s (dry-run)\n", name, t.Scope)
+		o.status("  ~ claude mcp remove %s -s %s (dry-run)", name, t.Scope)
 		return true, nil
 	}
 	if _, err := e.Run(ctx, Cmd{Name: cli, Args: []string{"mcp", "remove", name, "-s", t.Scope}, Dir: e.Cwd}); err != nil {
 		return false, fmt.Errorf("claude mcp remove: %w", err)
 	}
-	fmt.Fprintf(o.Out, "  ✓ removido com `claude mcp remove` (escopo %s)\n", t.Scope)
+	o.status("  ✓ removido com `claude mcp remove` (escopo %s)", t.Scope)
 	return true, nil
 }
 

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/sidiney/pm-mcp/internal/provider"
+	"github.com/sidiney/pm-mcp/internal/ui"
 )
 
 // Build describes the binary being installed.
@@ -104,12 +105,13 @@ func run(ctx context.Context, args []string, b Build, e *Env, stdin io.Reader, s
 		}
 		return 2
 	}
+	ec := ui.For(stderr)
 	if fs.NArg() > 0 {
-		fmt.Fprintf(stderr, "argumento inesperado: %s\n", fs.Arg(0))
+		fmt.Fprintf(stderr, "%s argumento inesperado: %s\n", ec.BoldRed("erro:"), fs.Arg(0))
 		return 2
 	}
 
-	w := &wizard{ctx: ctx, b: b, e: e, o: o, p: NewPrompter(stdin, stdout, o.yes), out: stdout}
+	w := &wizard{ctx: ctx, b: b, e: e, o: o, p: NewPrompter(stdin, stdout, o.yes), out: stdout, c: ui.For(stdout)}
 	var err error
 	switch cmd {
 	case "install":
@@ -121,10 +123,10 @@ func run(ctx context.Context, args []string, b Build, e *Env, stdin io.Reader, s
 	}
 	if err != nil {
 		if errors.Is(err, errAborted) {
-			fmt.Fprintln(stdout, "Nada foi alterado.")
+			fmt.Fprintln(stdout, w.c.Yellow("Nada foi alterado."))
 			return 1
 		}
-		fmt.Fprintln(stderr, "erro:", err)
+		fmt.Fprintln(stderr, ec.BoldRed("erro:"), ec.Red(err.Error()))
 		return 1
 	}
 	return 0

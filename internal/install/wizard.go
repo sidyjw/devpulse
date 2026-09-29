@@ -11,6 +11,7 @@ import (
 
 	"github.com/sidiney/pm-mcp/internal/provider"
 	"github.com/sidiney/pm-mcp/internal/settings"
+	"github.com/sidiney/pm-mcp/internal/ui"
 )
 
 type wizard struct {
@@ -20,11 +21,27 @@ type wizard struct {
 	o   *options
 	p   *Prompter
 	out io.Writer
+	c   ui.Palette
 }
 
 func (w *wizard) printf(format string, args ...any) { fmt.Fprintf(w.out, format, args...) }
 
-func (w *wizard) section(title string) { w.printf("\n== %s ==\n", title) }
+// status prints one line that starts with a status marker (✓ ✗ ! →).
+func (w *wizard) status(format string, args ...any) {
+	fmt.Fprintln(w.out, w.c.Mark(fmt.Sprintf(format, args...)))
+}
+
+// note prints a secondary, discreet line.
+func (w *wizard) note(format string, args ...any) {
+	fmt.Fprintln(w.out, w.c.Dim(fmt.Sprintf(format, args...)))
+}
+
+func (w *wizard) section(title string) { w.printf("\n%s\n", w.c.Section(title)) }
+
+// header is the banner printed at the start of install and uninstall.
+func (w *wizard) header(action string) {
+	w.printf("%s\n%s\n", w.c.Title(w.b.Name, w.b.Version, action), w.c.Field("Sistema", w.e.Describe()))
+}
 
 // ---------- harness, apps and targets ----------
 
@@ -122,12 +139,12 @@ func (w *wizard) chooseTargets() (*selection, error) {
 			return nil, err
 		}
 		if prev != "" {
-			w.printf("  %s usa o mesmo arquivo que %s; ele será gravado uma vez só.\n", t.Label(), prev)
+			w.note("  %s usa o mesmo arquivo que %s; ele será gravado uma vez só.", t.Label(), prev)
 			continue
 		}
 		if t.Path != "" {
 			if prev, ok := seen[t.Key()]; ok {
-				w.printf("  %s usa o mesmo arquivo que %s; ele será gravado uma vez só.\n", t.Label(), prev)
+				w.note("  %s usa o mesmo arquivo que %s; ele será gravado uma vez só.", t.Label(), prev)
 				continue
 			}
 			seen[t.Key()] = t.Label()
@@ -202,10 +219,10 @@ func (w *wizard) targetFor(a App, defaults map[string]string) (Target, string, e
 	}
 
 	if t.Note != "" {
-		w.printf("  %s: %s\n", t.Label(), t.Note)
+		w.printf("  %s %s\n", w.c.Bold(t.Label()+":"), w.c.Dim(t.Note))
 	}
 	if _, ok := a.(claudeCode); ok && claudeCLI(w.e) != "" {
-		w.printf("  (o Claude Code será configurado com `claude mcp add-json`; troque o arquivo só se você usa outro)\n")
+		w.note("  (o Claude Code será configurado com `claude mcp add-json`; troque o arquivo só se você usa outro)")
 	}
 	p, err := w.p.Input("Arquivo de configuração do "+t.Label(), t.Path, required)
 	if err != nil {
@@ -233,7 +250,7 @@ func (w *wizard) findExisting(ts []Target, names ...string) []found {
 		}
 		entries, err := ReadEntries(t.Path, t.Keys)
 		if err != nil {
-			w.printf("  ! não consegui ler %s: %v\n", t.Path, err)
+			w.status("  ! não consegui ler %s: %v", t.Path, err)
 			continue
 		}
 		for _, n := range names {
@@ -295,7 +312,7 @@ func (w *wizard) chooseComponents(prefill map[string]string) (*provider.Provider
 		}
 	} else if len(ps) == 1 {
 		pi = 0
-		w.printf("Ferramenta: %s (a única disponível nesta versão)\n", ps[0].Name)
+		w.printf("%s %s\n", w.c.Field("Ferramenta", w.c.Cyan(ps[0].Name)), w.c.Dim("(a única disponível nesta versão)"))
 	} else {
 		opts := make([]Option, len(ps))
 		for i, p := range ps {
@@ -460,12 +477,13 @@ func (w *wizard) askSetting(s provider.Setting, prefill, env map[string]string) 
 		if err := validate(v); err != nil {
 			return fmt.Errorf("--set %s: %w", s.Env, err)
 		}
-		w.printf("%s: %s\n", s.Label, v)
+		w.p.answered(s.Label, v)
 		if v != "" && !(s.Kind == provider.Bool && !settings.EnvBool(v)) {
 			env[s.Env] = v
 		}
 		return nil
 	}
+	w.guide(s.Guide, prefill, env)
 	def := w.defaultFor(s, prefill)
 	if s.Kind == provider.Bool {
 		yes, err := w.p.Confirm(label(s), settings.EnvBool(def))
@@ -487,16 +505,70 @@ func (w *wizard) askSetting(s provider.Setting, prefill, env map[string]string) 
 	return nil
 }
 
+// guide prints the step-by-step explanation of where to get a value.
+func (w *wizard) guide(g *provider.Guide, prefill, env map[string]string) {
+	if g == nil {
+		return
+	}
+	lookup := func(k string) string {
+		if v := env[k]; v != "" {
+			return v
+		}
+		return prefill[k]
+	}
+	w.printf("\n  %s %s\n", w.c.BoldCyan("ℹ"), w.c.Bold(g.Title))
+	for i, step := range g.Steps {
+		w.printf("    %s %s\n", w.c.Cyan(fmt.Sprintf("%d.", i+1)), w.links(expandGuide(step, lookup)))
+	}
+	w.printf("\n")
+}
+
+// expandGuide replaces {ENV} and {ENV|fallback} with the values answered so
+// far (without a trailing slash, so URLs can be joined).
+func expandGuide(s string, lookup func(string) string) string {
+	var b strings.Builder
+	for {
+		i := strings.IndexByte(s, '{')
+		j := strings.IndexByte(s[i+1:], '}')
+		if i < 0 || j < 0 {
+			b.WriteString(s)
+			return b.String()
+		}
+		name, fallback, _ := strings.Cut(s[i+1:i+1+j], "|")
+		v := strings.TrimRight(strings.TrimSpace(lookup(name)), "/")
+		if v == "" {
+			v = fallback
+		}
+		b.WriteString(s[:i] + v)
+		s = s[i+2+j:]
+	}
+}
+
+// links highlights the URLs of a line of text.
+func (w *wizard) links(s string) string {
+	if !w.c.Enabled() {
+		return s
+	}
+	words := strings.Split(s, " ")
+	for i, word := range words {
+		if strings.HasPrefix(word, "https://") {
+			url := strings.TrimRight(word, ".,;:)")
+			words[i] = w.c.Link(url) + word[len(url):]
+		}
+	}
+	return strings.Join(words, " ")
+}
+
 func (w *wizard) askSecret(s provider.Setting, prefill, env map[string]string) error {
 	if v, ok := w.o.set[s.SecretAlt]; ok {
 		env[s.SecretAlt] = v
-		w.printf("%s: definido inline via --set (prefira %s)\n", s.SecretAlt, s.Env)
+		w.status("! %s: definido inline via --set (prefira %s)", s.SecretAlt, s.Env)
 		return nil
 	}
 	inline := prefill[s.SecretAlt]
 	moveInline := false
 	if inline != "" && prefill[s.Env] == "" {
-		w.printf("A configuração atual tem %s escrito direto no arquivo de configuração.\n", s.SecretAlt)
+		w.status("! A configuração atual tem %s escrito direto no arquivo de configuração.", s.SecretAlt)
 		var err error
 		if moveInline, err = w.p.Confirm("Mover o segredo para um arquivo só seu?", true); err != nil {
 			return err
@@ -510,7 +582,7 @@ func (w *wizard) askSecret(s provider.Setting, prefill, env map[string]string) e
 	var path string
 	if v, ok := w.o.set[s.Env]; ok {
 		path = v
-		w.printf("%s: %s\n", s.Label, v)
+		w.p.answered(s.Label, v)
 	} else {
 		var err error
 		if path, err = w.p.Input(label(s), w.defaultFor(s, prefill), required); err != nil {
@@ -524,24 +596,27 @@ func (w *wizard) askSecret(s provider.Setting, prefill, env map[string]string) e
 	env[s.Env] = path
 
 	if _, err := settings.ReadSecretFile(path); err == nil {
-		w.printf("  ✓ arquivo encontrado (conteúdo não exibido)\n")
+		w.status("  ✓ arquivo encontrado (conteúdo não exibido)")
 		return nil
 	} else if exists(path) {
-		w.printf("  ! %s existe, mas não é utilizável: %v\n", path, err)
+		w.status("  ! %s existe, mas não é utilizável: %v", path, err)
+	}
+	if !moveInline {
+		w.guide(s.Guide, prefill, env)
 	}
 	if w.o.dryRun {
-		w.printf("  (dry-run) o arquivo seria criado\n")
+		w.note("  (dry-run) o arquivo seria criado")
 		return nil
 	}
 	if moveInline {
 		if err := WriteSecretFile(w.ctx, w.e, path, inline); err != nil {
 			return err
 		}
-		w.printf("  ✓ segredo movido para %s\n", path)
+		w.status("  ✓ segredo movido para %s", path)
 		return nil
 	}
 	if w.p.Yes {
-		w.printf("  ! %s não existe; crie-o antes de usar (o -check vai falhar até lá)\n", path)
+		w.status("  ! %s não existe; crie-o antes de usar (o -check vai falhar até lá)", path)
 		return nil
 	}
 	create, err := w.p.Confirm("  O arquivo não existe. Criar agora a partir da área de transferência?", true)
@@ -549,7 +624,7 @@ func (w *wizard) askSecret(s provider.Setting, prefill, env map[string]string) e
 		return err
 	}
 	if !create {
-		w.printf("  ! crie %s antes de usar o servidor\n", path)
+		w.status("  ! crie %s antes de usar o servidor", path)
 		return nil
 	}
 	for {
@@ -563,17 +638,17 @@ func (w *wizard) askSecret(s provider.Setting, prefill, env map[string]string) e
 		if err == nil {
 			if err = WriteSecretFile(w.ctx, w.e, path, tok); err == nil {
 				clear()
-				w.printf("  ✓ token gravado em %s (conteúdo não exibido); área de transferência limpa\n", path)
+				w.status("  ✓ token gravado em %s (conteúdo não exibido); área de transferência limpa", path)
 				return nil
 			}
 		}
-		w.printf("  ✗ %v\n", err)
+		w.status("  ✗ %v", err)
 		again, cerr := w.p.Confirm("  Tentar de novo?", true)
 		if cerr != nil {
 			return cerr
 		}
 		if !again {
-			w.printf("  ! crie %s antes de usar o servidor\n", path)
+			w.status("  ! crie %s antes de usar o servidor", path)
 			return nil
 		}
 	}
@@ -636,7 +711,7 @@ func (w *wizard) runCheck(command string, env map[string]string) error {
 	out, err := w.e.Run(w.ctx, Cmd{Name: command, Args: []string{"-check"}, Env: base})
 	for _, line := range strings.Split(strings.TrimRight(out, "\r\n"), "\n") {
 		if line != "" {
-			w.printf("  %s\n", strings.TrimRight(line, "\r"))
+			w.status("  %s", strings.TrimRight(line, ""))
 		}
 	}
 	return err
@@ -645,7 +720,7 @@ func (w *wizard) runCheck(command string, env map[string]string) error {
 // ---------- install ----------
 
 func (w *wizard) install() error {
-	w.printf("%s %s — instalação\nSistema: %s\n", w.b.Name, w.b.Version, w.e.Describe())
+	w.header("instalação")
 
 	sel, err := w.chooseTargets()
 	if err != nil {
@@ -669,12 +744,12 @@ func (w *wizard) install() error {
 		}
 	}
 	if len(existing) > 0 {
-		w.printf("\nInstalação existente encontrada:\n")
+		w.printf("\n%s\n", w.c.Yellow("Instalação existente encontrada:"))
 		for _, f := range existing {
-			w.printf("  - %q em %s\n", f.name, f.t.Path)
+			w.printf("  %s %s em %s\n", w.c.Yellow("•"), w.c.Bold(fmt.Sprintf("%q", f.name)), f.t.Path)
 		}
 		if len(prefill) > 0 {
-			w.printf("Os valores atuais serão usados como padrão.\n")
+			w.note("Os valores atuais serão usados como padrão.")
 		}
 	}
 	// don't mutate the entry read from disk
@@ -699,16 +774,15 @@ func (w *wizard) install() error {
 
 	// ----- summary -----
 	w.section("Resumo")
-	w.printf("Executável: %s", command)
+	w.printf("%s", w.c.Field("Executável", w.c.Cyan(command)))
 	if copyBin {
-		w.printf("  (copiado de %s)", w.e.Exe)
+		w.printf("  %s", w.c.Dim("(copiado de "+w.e.Exe+")"))
 	}
-	w.printf("\n%s: ", p.Name)
 	var cn []string
 	for _, c := range comps {
 		cn = append(cn, c.Name)
 	}
-	w.printf("%s\nVariáveis:\n", strings.Join(cn, ", "))
+	w.printf("\n%s\n%s\n", w.c.Field(p.Name, w.c.Cyan(strings.Join(cn, ", "))), w.c.Dim("Variáveis:"))
 	owned := ownedEnv(w.b.Providers)
 	secretAlts := map[string]bool{}
 	for _, c := range comps {
@@ -721,38 +795,38 @@ func (w *wizard) install() error {
 	for _, k := range sortedKeys(env) {
 		v := env[k]
 		if secretAlts[k] || (!owned[k] && looksSecret(k)) {
-			v = "•••• (oculto)"
+			v = w.c.Dim("•••• (oculto)")
 		}
-		w.printf("  %s = %s\n", k, v)
+		w.printf("  %s %s %s\n", w.c.Cyan(k), w.c.Dim("="), v)
 	}
-	w.printf("Destinos:\n")
+	w.printf("%s\n", w.c.Dim("Destinos:"))
 	for _, t := range sel.targets {
 		where := t.Path
 		if where == "" {
-			where = "(só mostrar a configuração)"
+			where = w.c.Dim("(só mostrar a configuração)")
 		}
 		state := ""
 		for _, f := range existing {
 			if f.t.Key() == t.Key() && f.name == spec.Name {
-				state = " — substitui a entrada existente"
+				state = w.c.Yellow(" — substitui a entrada existente")
 			}
 		}
-		w.printf("  - %s: %s%s\n", t.Label(), where, state)
+		w.printf("  %s %s %s%s\n", w.c.Cyan("•"), w.c.Bold(t.Label()+":"), where, state)
 	}
 
 	if w.o.dryRun {
 		w.section("Dry-run")
 		o := Opts{DryRun: true, Out: w.out}
 		for _, t := range sel.targets {
-			w.printf("→ %s\n", t.Label())
+			w.status("→ %s", t.Label())
 			if err := t.App.Install(w.ctx, w.e, t, spec, o); err != nil {
-				w.printf("  ✗ %v\n", err)
+				w.status("  ✗ %v", err)
 			}
 			if t.Path != "" {
 				w.printf("%s\n", snippet(t.Keys, spec.Name, t.App.Entry(spec)))
 			}
 		}
-		w.printf("\nDry-run: nada foi gravado.\n")
+		w.printf("\n%s\n", w.c.Yellow("Dry-run: nada foi gravado."))
 		return nil
 	}
 
@@ -769,12 +843,12 @@ func (w *wizard) install() error {
 		if err := copyExecutable(w.e.Exe, command); err != nil {
 			return err
 		}
-		w.printf("✓ executável copiado para %s\n", command)
+		w.status("✓ executável copiado para %s", command)
 	}
 	if !w.o.skipCheck {
-		w.printf("Validando a configuração (%s -check)...\n", filepath.Base(command))
+		w.note("Validando a configuração (%s -check)...", filepath.Base(command))
 		if err := w.runCheck(command, env); err != nil {
-			w.printf("✗ a validação falhou: %v\n", err)
+			w.status("✗ a validação falhou: %v", err)
 			cont, cerr := w.p.Confirm("Gravar a configuração mesmo assim?", false)
 			if cerr != nil {
 				return cerr
@@ -783,14 +857,15 @@ func (w *wizard) install() error {
 				return errors.New("validação falhou; corrija e rode de novo (ou use --skip-check)")
 			}
 		} else {
-			w.printf("✓ configuração válida\n")
+			w.status("✓ configuração válida")
 		}
 	}
 
 	o := Opts{Out: w.out}
 	var failed []string
 	for _, t := range sel.targets {
-		w.printf("\n→ %s\n", t.Label())
+		w.printf("\n")
+		w.status("→ %s", t.Label())
 		replace := true
 		for _, f := range existing {
 			if f.t.Key() == t.Key() && f.name == spec.Name && !w.o.force {
@@ -800,13 +875,13 @@ func (w *wizard) install() error {
 			}
 		}
 		if !replace {
-			w.printf("  mantido como estava\n")
+			w.note("  = mantido como estava")
 			continue
 		}
 		if err := t.App.Install(w.ctx, w.e, t, spec, o); err != nil {
-			w.printf("  ✗ %v\n", err)
+			w.status("  ✗ %v", err)
 			if errors.Is(err, ErrNotJSON) {
-				w.printf("  Adicione manualmente:\n%s\n", snippet(t.Keys, spec.Name, t.App.Entry(spec)))
+				w.printf("  %s\n%s\n", w.c.Yellow("Adicione manualmente:"), snippet(t.Keys, spec.Name, t.App.Entry(spec)))
 			}
 			failed = append(failed, t.Label())
 			continue
@@ -819,7 +894,7 @@ func (w *wizard) install() error {
 				}
 				if rm {
 					if _, err := t.App.Uninstall(w.ctx, w.e, t, LegacyName, o); err != nil {
-						w.printf("  ✗ %v\n", err)
+						w.status("  ✗ %v", err)
 					}
 				}
 			}
@@ -828,11 +903,12 @@ func (w *wizard) install() error {
 
 	w.section("Próximos passos")
 	for _, a := range sel.apps {
-		w.printf("- %s: %s\n", a.Name(), a.NextSteps())
+		w.printf("%s %s %s\n", w.c.Cyan("•"), w.c.Bold(a.Name()+":"), a.NextSteps())
 	}
 	if len(failed) > 0 {
 		return fmt.Errorf("não foi possível configurar: %s", strings.Join(failed, ", "))
 	}
+	w.printf("\n%s\n", w.c.Mark("✓ "+w.c.Bold("Instalação concluída.")))
 	return nil
 }
 
@@ -852,14 +928,15 @@ func looksSecret(k string) bool {
 // ---------- uninstall ----------
 
 func (w *wizard) uninstall() error {
-	w.printf("%s — desinstalação\nSistema: %s\n", w.b.Name, w.e.Describe())
+	w.header("desinstalação")
 	sel, err := w.chooseTargets()
 	if err != nil {
 		return err
 	}
 	existing := w.findExisting(sel.targets, w.knownNames()...)
 	if len(existing) == 0 {
-		w.printf("\nNenhuma entrada %s encontrada nos destinos escolhidos.\n", strings.Join(quoteAll(w.knownNames()), " ou "))
+		w.printf("\n")
+		w.status("! Nenhuma entrada %s encontrada nos destinos escolhidos.", strings.Join(quoteAll(w.knownNames()), " ou "))
 		for _, t := range sel.targets {
 			if t.Path == "" {
 				_, _ = t.App.Uninstall(w.ctx, w.e, t, w.o.name, Opts{Out: w.out})
@@ -878,10 +955,11 @@ func (w *wizard) uninstall() error {
 			continue
 		}
 		if _, err := f.t.App.Uninstall(w.ctx, w.e, f.t, f.name, o); err != nil {
-			w.printf("  ✗ %v\n", err)
+			w.status("  ✗ %v", err)
 		}
 	}
-	w.printf("\nO executável e os arquivos de token não foram apagados; remova-os manualmente se quiser.\n")
+	w.printf("\n")
+	w.note("O executável e os arquivos de token não foram apagados; remova-os manualmente se quiser.")
 	return nil
 }
 
@@ -896,22 +974,22 @@ func quoteAll(ss []string) []string {
 // ---------- detect ----------
 
 func (w *wizard) detect() {
-	w.printf("%s %s\nSistema: %s\nExecutável atual: %s\n", w.b.Name, w.b.Version, w.e.Describe(), w.e.Exe)
+	w.printf("%s\n%s\n%s\n", w.c.Title(w.b.Name, w.b.Version, ""), w.c.Field("Sistema", w.e.Describe()), w.c.Field("Executável atual", w.e.Exe))
 	names := []string{w.b.Name, LegacyName}
 	for _, h := range Harnesses() {
 		if h.ID() == "generic" {
 			continue
 		}
-		w.printf("\n%s\n", h.Name())
+		w.section(h.Name())
 		for _, a := range h.Apps() {
-			mark := "–"
 			if a.Detect(w.e) {
-				mark = "✓"
+				w.status("  ✓ %s", w.c.Bold(a.Name()))
+			} else {
+				w.note("  – %s (não encontrado)", a.Name())
 			}
-			w.printf("  %s %s\n", mark, a.Name())
 			if _, ok := a.(claudeCode); ok {
 				if cli := claudeCLI(w.e); cli != "" {
-					w.printf("      CLI: %s\n", cli)
+					w.printf("      %s\n", w.c.Field("CLI", cli))
 				}
 			}
 			scopes := a.Scopes()
@@ -922,14 +1000,14 @@ func (w *wizard) detect() {
 				t := a.Target(w.e, sc)
 				prefix := ""
 				if sc != "" {
-					prefix = sc + ": "
+					prefix = w.c.Yellow(sc) + ": "
 				}
-				state := "não existe"
+				state := w.c.Dim("não existe")
 				if exists(t.Path) {
-					state = "sem entradas do servidor"
+					state = w.c.Dim("sem entradas do servidor")
 					entries, err := ReadEntries(t.Path, t.Keys)
 					if err != nil {
-						state = "ilegível: " + err.Error()
+						state = w.c.Red("ilegível: " + err.Error())
 					}
 					var got []string
 					for _, n := range names {
@@ -942,23 +1020,24 @@ func (w *wizard) detect() {
 						}
 					}
 					if len(got) > 0 {
-						state = strings.Join(got, "; ")
+						state = w.c.Green(strings.Join(got, "; "))
 					}
 				}
-				w.printf("      %s%s [%s]\n", prefix, t.Path, state)
+				w.printf("      %s%s %s\n", prefix, t.Path, w.c.Dim("[")+state+w.c.Dim("]"))
 				if t.Note != "" && sc == "" {
-					w.printf("      (%s)\n", t.Note)
+					w.note("      (%s)", t.Note)
 				}
 			}
 		}
 	}
-	w.printf("\nOutros clientes: `%s install --harness generic` mostra a configuração pronta.\n", w.b.Name)
-	w.printf("\nFerramentas de gestão disponíveis:\n")
+	w.section("Outros clientes")
+	w.printf("%s mostra a configuração pronta.\n", w.c.Cyan("`"+w.b.Name+" install --harness generic`"))
+	w.section("Ferramentas de gestão disponíveis")
 	for _, p := range w.b.Providers {
 		var cs []string
 		for _, c := range p.Components {
 			cs = append(cs, c.Name)
 		}
-		w.printf("  %s (%s): %s\n", p.Name, p.ID, strings.Join(cs, ", "))
+		w.printf("  %s %s %s %s\n", w.c.Cyan("•"), w.c.Bold(p.Name), w.c.Dim("("+p.ID+"):"), strings.Join(cs, ", "))
 	}
 }

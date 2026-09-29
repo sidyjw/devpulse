@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/sidiney/pm-mcp/internal/ui"
 )
 
 // Spec is the server entry the installer writes.
@@ -129,17 +131,20 @@ func fileUninstall(t Target, name string, o Opts) (bool, error) {
 	return res.Changed, nil
 }
 
+// status prints one line that starts with a status marker (✓ ✗ ~ =).
+func (o Opts) status(format string, args ...any) {
+	fmt.Fprintln(o.Out, ui.For(o.Out).Mark(fmt.Sprintf(format, args...)))
+}
+
 func reportWrite(o Opts, path string, res WriteResult) {
 	switch {
 	case !res.Changed:
-		fmt.Fprintf(o.Out, "  = %s já estava atualizado\n", path)
+		o.status("  = %s já estava atualizado", path)
 	case o.DryRun:
-		fmt.Fprintf(o.Out, "  ~ %s seria alterado (dry-run)\n", path)
+		o.status("  ~ %s seria alterado (dry-run)", path)
+	case res.Backup != "":
+		o.status("  ✓ %s atualizado %s", path, ui.For(o.Out).Dim("(backup: "+res.Backup+")"))
 	default:
-		fmt.Fprintf(o.Out, "  ✓ %s atualizado", path)
-		if res.Backup != "" {
-			fmt.Fprintf(o.Out, " (backup: %s)", res.Backup)
-		}
-		fmt.Fprintln(o.Out)
+		o.status("  ✓ %s atualizado", path)
 	}
 }

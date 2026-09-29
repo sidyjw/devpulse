@@ -98,9 +98,11 @@ O assistente faz isto:
 3. Mostra o **arquivo de configuração padrão** de cada app. Tecle Enter para aceitar ou digite outro caminho se o seu ambiente é customizado.
 4. Pergunta a **ferramenta de gestão** e os **componentes** que você quer integrar.
 5. Pergunta só as configurações desses componentes, cada uma com um valor padrão. As opções avançadas (somente leitura, exclusão, time padrão, tempo limite…) ficam atrás de uma pergunta.
-6. Para cada token: se o arquivo não existe, oferece criá-lo. **Copie o token (Ctrl+C) e tecle Enter.** O instalador lê a área de transferência, grava um arquivo que só você pode ler (`chmod 600` ou `icacls`) e limpa a área de transferência. O token nunca aparece na tela nem no histórico do terminal.
+6. Para cada token: se o arquivo não existe, mostra o passo a passo para gerá-lo (com o link da sua organização) e oferece criá-lo. **Copie o token (Ctrl+C) e tecle Enter.** O instalador lê a área de transferência, grava um arquivo que só você pode ler (`chmod 600` ou `icacls`) e limpa a área de transferência. O token nunca aparece na tela nem no histórico do terminal.
 7. Copia o executável para um lugar fixo: `%LOCALAPPDATA%\Programs\pm-mcp\` no Windows ou `~/.local/bin/` no macOS/Linux. Esse lugar também pode ser alterado.
 8. Mostra um **resumo**, roda o `-check` com a configuração nova e só então grava. Antes de alterar um arquivo existente, faz backup dele (`*.bak-AAAAMMDD-HHMMSS`) e mantém tudo o que não é do servidor.
+
+Nos menus e nas perguntas de sim/não, navegue com as **setas**: ↑/↓ movem, **Espaço** marca nas listas de múltipla escolha, ←/→ alternam entre Sim e Não, **Enter** confirma e **Ctrl+C** cancela sem alterar nada. A linha de ajuda aparece embaixo de cada pergunta. Fora de um terminal (por exemplo, com a entrada vinda de um pipe), o instalador aceita as respostas digitadas por número.
 
 Se já existir uma instalação, os valores dela viram o padrão. Isso vale também para a entrada `7pace` antiga, e o instalador oferece removê-la.
 
@@ -277,7 +279,7 @@ internal/install/                # instalador: harnesses, apps, edição de conf
 ## Adicionando um provider
 
 1. Crie `internal/providers/<nome>/` com uma função que devolva um `provider.Provider`, com um `provider.Component` para cada módulo. Cada componente declara:
-   - `Settings`: as variáveis que ele lê, com rótulo, ajuda, tipo (`String`, `URL`, `SecretFile`, `Bool`, `Duration`), se é obrigatória ou avançada, o valor padrão e a **mesma** função de validação usada pelo servidor. O instalador monta as perguntas a partir disso.
+   - `Settings`: as variáveis que ele lê, com rótulo, ajuda, tipo (`String`, `URL`, `SecretFile`, `Bool`, `Duration`), se é obrigatória ou avançada, o valor padrão e a **mesma** função de validação usada pelo servidor. O instalador monta as perguntas a partir disso. Opcionalmente, `Guide` traz um passo a passo de onde obter o valor, e os passos podem citar respostas anteriores como `{VARIAVEL|alternativa}`. Nos tokens, o guia só aparece quando o arquivo ainda precisa ser criado.
    - `Enabled`: quando o ambiente liga o componente.
    - `Build`: cria a instância. `bc.Get("<provider>.<componente>")` dá acesso a componentes construídos antes.
    - `Instructions`: regras que entram nas instructions do servidor MCP.

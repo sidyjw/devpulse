@@ -15,6 +15,7 @@ import (
 	"github.com/sidiney/pm-mcp/internal/mcp"
 	"github.com/sidiney/pm-mcp/internal/provider"
 	"github.com/sidiney/pm-mcp/internal/settings"
+	"github.com/sidiney/pm-mcp/internal/ui"
 )
 
 const (
@@ -87,7 +88,16 @@ func boardsComponent() provider.Component {
 			{Env: "AZURE_DEVOPS_ORG_URL", Label: "URL da organização", Help: "ex.: https://dev.azure.com/minhaorg",
 				Kind: provider.URL, Required: true, Validate: settings.CheckHTTPSURL},
 			{Env: "AZURE_DEVOPS_PAT_FILE", Label: "Arquivo com o PAT", Help: "escopos: Work Items (Read & write) e Project and Team (Read)",
-				Kind: provider.SecretFile, Required: true, SecretAlt: "AZURE_DEVOPS_PAT", Default: secretDefault("azdo-pat", "azdo-pat")},
+				Kind: provider.SecretFile, Required: true, SecretAlt: "AZURE_DEVOPS_PAT", Default: secretDefault("azdo-pat", "azdo-pat"),
+				Guide: &provider.Guide{
+					Title: "Como gerar o PAT (Personal Access Token) do Azure DevOps",
+					Steps: []string{
+						"Abra {AZURE_DEVOPS_ORG_URL|https://dev.azure.com/<sua-org>}/_usersSettings/tokens (ou, no Azure DevOps: ícone de usuário no canto superior direito → Personal access tokens).",
+						"Clique em New Token, dê um nome (ex.: pm-mcp) e escolha a organização e a validade.",
+						"Em Scopes, escolha Custom defined e marque: Work Items → Read & write; Project and Team → Read (use Show all scopes se algum não aparecer). Para uso somente leitura, Work Items → Read basta.",
+						"Clique em Create e copie o token: ele só é mostrado uma vez.",
+					},
+				}},
 			{Env: "AZURE_DEVOPS_PROJECT", Label: "Projeto padrão", Help: "opcional; evita repetir o projeto em toda pergunta"},
 			{Env: "AZURE_DEVOPS_TEAM", Label: "Time padrão", Help: "opcional; se vazio, usa o time padrão do projeto", Advanced: true},
 			{Env: "AZURE_DEVOPS_READ_ONLY", Label: "Somente leitura?", Help: "esconde as tools que criam ou alteram work items",
@@ -115,29 +125,31 @@ type boardsInstance struct {
 func (b *boardsInstance) Register(s *mcp.Server) { registerAzDOTools(s, b.az, b.cfg) }
 
 func (b *boardsInstance) Check(ctx context.Context, w io.Writer) error {
-	fmt.Fprintln(w, "Azure DevOps:", b.cfg.OrgURL)
-	defer fmt.Fprintf(w, "  somente leitura: %v\n", b.cfg.ReadOnly)
+	c := ui.For(w)
+	line := func(format string, args ...any) { fmt.Fprintln(w, c.Mark(fmt.Sprintf(format, args...))) }
+	fmt.Fprintln(w, c.BoldCyan("Azure DevOps:"), b.cfg.OrgURL)
+	defer func() { fmt.Fprintln(w, c.Dim(fmt.Sprintf("  somente leitura: %v", b.cfg.ReadOnly))) }()
 	me, err := b.az.Me(ctx)
 	if err != nil {
-		fmt.Fprintln(w, "  ✗", err)
+		line("  ✗ %v", err)
 		return err
 	}
-	fmt.Fprintf(w, "  ✓ conectado como %s (%s)\n", me.DisplayName, me.Account)
+	line("  ✓ conectado como %s (%s)", c.Bold(me.DisplayName), me.Account)
 	var failed error
 	if ps, err := b.az.Projects(ctx); err != nil {
-		fmt.Fprintln(w, "  ✗ listar projetos:", err, "(o PAT precisa de Project and Team: Read)")
+		line("  ✗ listar projetos: %v (o PAT precisa de Project and Team: Read)", err)
 		failed = err
 	} else {
-		fmt.Fprintf(w, "  ✓ %d projetos visíveis\n", len(ps))
+		line("  ✓ %d projetos visíveis", len(ps))
 	}
 	if b.cfg.Project != "" {
 		if sps, _, team, err := b.az.Sprints(ctx, "", "", "current"); err != nil {
-			fmt.Fprintln(w, "  ✗ sprints:", err)
+			line("  ✗ sprints: %v", err)
 			failed = err
 		} else if len(sps) > 0 {
-			fmt.Fprintf(w, "  ✓ time %q, sprint atual: %s (%s a %s)\n", team, sps[0].Name, sps[0].StartDate, sps[0].FinishDate)
+			line("  ✓ time %q, sprint atual: %s (%s a %s)", team, sps[0].Name, sps[0].StartDate, sps[0].FinishDate)
 		} else {
-			fmt.Fprintf(w, "  ✓ time %q (sem sprint atual)\n", team)
+			line("  ✓ time %q (sem sprint atual)", team)
 		}
 	}
 	return failed
@@ -200,7 +212,16 @@ func sevenPaceComponent() provider.Component {
 			{Env: "SEVENPACE_ORGANIZATION", Label: "Organização do 7pace", Help: "o prefixo de https://<org>.timehub.7pace.com",
 				Required: true, Validate: settings.CheckOrgName},
 			{Env: "SEVENPACE_TOKEN_FILE", Label: "Arquivo com o token do 7pace", Help: "gere em 7pace → Settings → API & Reporting",
-				Kind: provider.SecretFile, Required: true, SecretAlt: "SEVENPACE_TOKEN", Default: secretDefault("7pace-token", "token")},
+				Kind: provider.SecretFile, Required: true, SecretAlt: "SEVENPACE_TOKEN", Default: secretDefault("7pace-token", "token"),
+				Guide: &provider.Guide{
+					Title: "Como gerar o token da API do 7pace Timetracker",
+					Steps: []string{
+						"Abra o 7pace em https://{SEVENPACE_ORGANIZATION|<org>}.timehub.7pace.com (ou pela aba Timetracker dentro do Azure DevOps).",
+						"Vá em Settings (ícone de engrenagem) → API & Reporting.",
+						"Crie um novo token (Create New Token) com um nome como pm-mcp.",
+						"Copie o token: ele só é mostrado uma vez. Se a opção não aparecer, peça ao administrador do 7pace acesso à API.",
+					},
+				}},
 			{Env: "SEVENPACE_BASE_URL", Label: "URL da API (substitui a organização)", Help: "só para ambientes fora do padrão; precisa ser https",
 				Kind: provider.URL, Advanced: true, Validate: settings.CheckHTTPSURL},
 			{Env: "SEVENPACE_READ_ONLY", Label: "Somente leitura?", Help: "esconde as tools que lançam ou alteram horas",
@@ -234,16 +255,20 @@ type sevenPaceInstance struct {
 func (i *sevenPaceInstance) Register(s *mcp.Server) { registerSevenPaceTools(s, i.sp, i.az, i.cfg) }
 
 func (i *sevenPaceInstance) Check(ctx context.Context, w io.Writer) error {
-	fmt.Fprintln(w, "7pace:", i.cfg.APIRoot)
-	defer fmt.Fprintf(w, "  somente leitura: %v | exclusão habilitada: %v\n", i.cfg.ReadOnly, i.cfg.EnableDelete && !i.cfg.ReadOnly)
+	c := ui.For(w)
+	line := func(format string, args ...any) { fmt.Fprintln(w, c.Mark(fmt.Sprintf(format, args...))) }
+	fmt.Fprintln(w, c.BoldCyan("7pace:"), i.cfg.APIRoot)
+	defer func() {
+		fmt.Fprintln(w, c.Dim(fmt.Sprintf("  somente leitura: %v | exclusão habilitada: %v", i.cfg.ReadOnly, i.cfg.EnableDelete && !i.cfg.ReadOnly)))
+	}()
 	me, err := i.sp.Me(ctx)
 	if err != nil {
-		fmt.Fprintln(w, "  ✗", err)
+		line("  ✗ %v", err)
 		return err
 	}
-	fmt.Fprintf(w, "  ✓ conectado como %s (%s)\n", me.User.Name, me.User.UniqueName)
+	line("  ✓ conectado como %s (%s)", c.Bold(me.User.Name), me.User.UniqueName)
 	if at, err := i.sp.ActivityTypes(ctx); err == nil {
-		fmt.Fprintf(w, "  ✓ %d tipos de atividade\n", len(at))
+		line("  ✓ %d tipos de atividade", len(at))
 	}
 	return nil
 }
