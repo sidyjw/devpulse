@@ -1,0 +1,8 @@
+pm-mcp
+pm-mcp.exe
+pm-mcp.exe.old
+7pace-mcp
+7pace-mcp.exe
+*.token
+*.bak-*
+.env
