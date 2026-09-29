@@ -309,3 +309,7 @@ Os testes não acessam a rede:
 - Os horários são enviados como hora local, sem fuso (`AAAA-MM-DDTHH:MM:SS`), como na documentação da 7pace. O padrão de início é 09:00.
 - O instalador não reescreve arquivos com comentários (JSONC, como o `settings.json` do Zed ou do VS Code). Nesses casos, ele mostra o trecho para colar.
 - Se o `claude` no Windows for o atalho `.cmd` do npm, o instalador edita o `~/.claude.json` direto em vez de chamar o CLI, porque o `cmd.exe` corrompe argumentos JSON. Feche as sessões do Claude Code antes de instalar.
+
+## Licença
+
+[MIT](LICENSE)
