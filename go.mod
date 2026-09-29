@@ -1,3 +1,3 @@
-module github.com/sidiney/devpulse
+module github.com/sidyjw/devpulse
 
 go 1.22

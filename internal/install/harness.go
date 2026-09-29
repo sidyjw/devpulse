@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sidiney/devpulse/internal/ui"
+	"github.com/sidyjw/devpulse/internal/ui"
 )
 
 // Spec is the server entry the installer writes.

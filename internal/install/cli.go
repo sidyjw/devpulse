@@ -12,8 +12,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sidiney/devpulse/internal/provider"
-	"github.com/sidiney/devpulse/internal/ui"
+	"github.com/sidyjw/devpulse/internal/provider"
+	"github.com/sidyjw/devpulse/internal/ui"
 )
 
 // Build describes the binary being installed.

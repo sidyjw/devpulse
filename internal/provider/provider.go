@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/sidiney/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/mcp"
 )
 
 // SettingKind tells the installer how to ask for and store a value.

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sidiney/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/mcp"
 )
 
 // ---------- date helpers (calendar dates in the user's local time) ----------

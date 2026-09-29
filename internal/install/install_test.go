@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sidiney/devpulse/internal/provider"
-	"github.com/sidiney/devpulse/internal/providers/azuredevops"
+	"github.com/sidyjw/devpulse/internal/provider"
+	"github.com/sidyjw/devpulse/internal/providers/azuredevops"
 )
 
 // ---------- helpers ----------

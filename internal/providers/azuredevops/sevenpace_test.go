@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sidiney/devpulse/internal/httpx"
-	"github.com/sidiney/devpulse/internal/mcp"
-	"github.com/sidiney/devpulse/internal/mcp/mcptest"
+	"github.com/sidyjw/devpulse/internal/httpx"
+	"github.com/sidyjw/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/mcp/mcptest"
 )
 
 const token = "super-secret-token-123"

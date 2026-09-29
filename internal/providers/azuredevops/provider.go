@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sidiney/devpulse/internal/mcp"
-	"github.com/sidiney/devpulse/internal/provider"
-	"github.com/sidiney/devpulse/internal/settings"
-	"github.com/sidiney/devpulse/internal/ui"
+	"github.com/sidyjw/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/provider"
+	"github.com/sidyjw/devpulse/internal/settings"
+	"github.com/sidyjw/devpulse/internal/ui"
 )
 
 const (

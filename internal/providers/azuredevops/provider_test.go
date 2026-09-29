@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sidiney/devpulse/internal/httpx"
-	"github.com/sidiney/devpulse/internal/mcp"
-	"github.com/sidiney/devpulse/internal/provider"
+	"github.com/sidyjw/devpulse/internal/httpx"
+	"github.com/sidyjw/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/provider"
 )
 
 func env(m map[string]string) func(string) string { return func(k string) string { return m[k] } }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sidiney/devpulse/internal/ui"
+	"github.com/sidyjw/devpulse/internal/ui"
 )
 
 // Arrow-key menus, used when stdin and stdout are a terminal. Each question

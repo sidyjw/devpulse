@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sidiney/devpulse/internal/mcp"
-	"github.com/sidiney/devpulse/internal/mcp/mcptest"
+	"github.com/sidyjw/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/mcp/mcptest"
 )
 
 func TestProtocolBasics(t *testing.T) {

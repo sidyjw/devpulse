@@ -19,12 +19,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sidiney/devpulse/internal/httpx"
-	"github.com/sidiney/devpulse/internal/install"
-	"github.com/sidiney/devpulse/internal/mcp"
-	"github.com/sidiney/devpulse/internal/provider"
-	"github.com/sidiney/devpulse/internal/providers"
-	"github.com/sidiney/devpulse/internal/settings"
+	"github.com/sidyjw/devpulse/internal/httpx"
+	"github.com/sidyjw/devpulse/internal/install"
+	"github.com/sidyjw/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/provider"
+	"github.com/sidyjw/devpulse/internal/providers"
+	"github.com/sidyjw/devpulse/internal/settings"
 )
 
 const (
