@@ -73,7 +73,22 @@ Excluir work items não é suportado de propósito. Para isso, use `state: "Remo
 
 ## Instalação rápida
 
-### 1. Compile (precisa do [Go](https://go.dev/dl/) 1.22 ou superior)
+### 1. Baixe ou compile
+
+**Binário pronto:** na página de [Releases](https://github.com/sidyjw/devpulse/releases), baixe o arquivo do seu sistema (`windows`, `darwin` = macOS ou `linux`; `amd64` = Intel/AMD, `arm64` = ARM/Apple Silicon) e extraia. Para conferir o download:
+
+```bash
+sha256sum -c SHA256SUMS.txt --ignore-missing                         # integridade
+gh attestation verify devpulse_*_linux_amd64.tar.gz --repo sidyjw/devpulse   # foi gerado pelo workflow deste repositório
+```
+
+**Com o Go instalado:**
+
+```bash
+go install github.com/sidyjw/devpulse@latest
+```
+
+**Compilando o código** (precisa do [Go](https://go.dev/dl/) 1.22 ou superior):
 
 ```powershell
 # Windows (PowerShell), dentro da pasta do projeto
@@ -277,6 +292,7 @@ internal/provider/               # contratos Provider / Component / Setting e a 
 internal/providers/registry.go   # lista de providers desta versão
 internal/providers/azuredevops/  # provider Azure DevOps: componentes Boards e 7pace
 internal/install/                # instalador: harnesses, apps, edição de config, prompts
+.github/workflows/release.yml    # build e publicação das releases a cada tag vX.Y.Z
 ```
 
 ## Adicionando um provider
@@ -301,6 +317,18 @@ go test -race ./...
 Os testes não acessam a rede:
 - **Servidor e providers**: usam servidores 7pace e Azure DevOps falsos (`httptest`). Verificam payloads, parâmetros da API, PATCH, bloqueio de duplicidade, validação de lote, bloqueio de redirect, remoção do token de mensagens de erro, limite de tamanho de resposta, escape de WIQL, configuração e ativação dos componentes.
 - **Instalador**: roda em diretórios temporários com comandos externos simulados. Cobre a edição de JSON (preserva chaves e ordem, faz backup, é idempotente, recusa JSON com comentários), os caminhos por sistema (incluindo o Claude Desktop MSIX), o uso seguro do CLI `claude`, os fluxos interativo e não interativo, o dry-run, a migração da entrada `7pace` e a gravação do token.
+
+## Versões e releases
+
+O projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) e ainda está na série `0.x`: enquanto não chegar à `1.0.0`, uma versão MINOR (`0.1` → `0.2`) pode trazer mudanças incompatíveis, sempre descritas no [CHANGELOG](CHANGELOG.md). `devpulse -version` mostra a versão instalada.
+
+Para publicar uma versão:
+
+1. Mova o que está em **[Não lançado]** no `CHANGELOG.md` para uma seção `## [X.Y.Z] - AAAA-MM-DD` e atualize os links do fim do arquivo.
+2. Faça o commit e crie a tag anotada: `git tag -a vX.Y.Z -m "vX.Y.Z"`.
+3. Envie: `git push origin main vX.Y.Z`.
+
+O workflow [`release.yml`](.github/workflows/release.yml) roda os testes, compila para Windows, macOS e Linux (amd64 e arm64) com a versão embutida, gera o `SHA256SUMS.txt`, o atestado de proveniência e publica a release com as notas do CHANGELOG. Tags com sufixo (`v0.2.0-rc.1`) viram pre-release.
 
 ## Limitações
 

@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -27,10 +28,22 @@ import (
 	"github.com/sidyjw/devpulse/internal/settings"
 )
 
-const (
-	name    = "devpulse"
-	version = "2.0.0"
-)
+const name = "devpulse"
+
+// version is set by the release build (-ldflags "-X main.version=0.1.0").
+// Other builds fall back to the module version (go install ...@v0.1.0) and,
+// failing that, to "dev".
+var version string
+
+func init() {
+	if version != "" {
+		return
+	}
+	version = "dev"
+	if bi, ok := debug.ReadBuildInfo(); ok && strings.HasPrefix(bi.Main.Version, "v") {
+		version = strings.TrimPrefix(bi.Main.Version, "v")
+	}
+}
 
 const instructions = `Servidor para trabalhar com ferramentas de gestão de projetos.
 Regras:
