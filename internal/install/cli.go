@@ -12,8 +12,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sidiney/pm-mcp/internal/provider"
-	"github.com/sidiney/pm-mcp/internal/ui"
+	"github.com/sidiney/devpulse/internal/provider"
+	"github.com/sidiney/devpulse/internal/ui"
 )
 
 // Build describes the binary being installed.
@@ -22,8 +22,19 @@ type Build struct {
 	Providers     []provider.Provider
 }
 
-// LegacyName is the entry name used by 7pace-mcp, migrated on install.
-const LegacyName = "7pace"
+// LegacyNames are the entry names used by earlier versions of the project,
+// newest first: pm-mcp, and 7pace-mcp (entry "7pace") before it. Install
+// migrates them; uninstall and detect find them too.
+var LegacyNames = []string{"pm-mcp", "7pace"}
+
+func isLegacy(name string) bool {
+	for _, n := range LegacyNames {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
 
 // IsCommand reports whether arg is an installer subcommand.
 func IsCommand(arg string) bool {

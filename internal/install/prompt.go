@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sidiney/pm-mcp/internal/ui"
+	"github.com/sidiney/devpulse/internal/ui"
 )
 
 // Prompter asks questions on a terminal. With Yes set it never reads input

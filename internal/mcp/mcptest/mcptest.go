@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sidiney/pm-mcp/internal/mcp"
+	"github.com/sidiney/devpulse/internal/mcp"
 )
 
 // Recorded is one request received by a Fake.

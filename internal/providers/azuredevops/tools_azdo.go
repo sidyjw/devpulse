@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/sidiney/pm-mcp/internal/mcp"
+	"github.com/sidiney/devpulse/internal/mcp"
 )
 
 var fieldsMapP = map[string]any{

@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sidiney/pm-mcp/internal/ui"
+	"github.com/sidiney/devpulse/internal/ui"
 )
 
 // Spec is the server entry the installer writes.

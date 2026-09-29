@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sidiney/pm-mcp/internal/httpx"
-	"github.com/sidiney/pm-mcp/internal/mcp"
-	"github.com/sidiney/pm-mcp/internal/provider"
+	"github.com/sidiney/devpulse/internal/httpx"
+	"github.com/sidiney/devpulse/internal/mcp"
+	"github.com/sidiney/devpulse/internal/provider"
 )
 
 func env(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
@@ -57,6 +57,38 @@ func TestTokenFile(t *testing.T) {
 	cfg, err := loadSevenPaceConfig(env(map[string]string{"SEVENPACE_ORGANIZATION": "org", "SEVENPACE_TOKEN_FILE": p}))
 	if err != nil || cfg.Token != "abc123" {
 		t.Fatalf("cfg=%+v err=%v", cfg, err)
+	}
+}
+
+func TestSecretDefaultReusesLegacyFiles(t *testing.T) {
+	home := t.TempDir()
+	def := secretDefault("7pace-token", "token")
+	write := func(p string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	current := filepath.Join(home, ".devpulse", "7pace-token")
+	if got := def(home); got != current {
+		t.Errorf("sem arquivos: %s", got)
+	}
+	sevenPace := filepath.Join(home, ".7pace", "token")
+	write(sevenPace)
+	if got := def(home); got != sevenPace {
+		t.Errorf("com ~/.7pace: %s", got)
+	}
+	pmMcp := filepath.Join(home, ".pm-mcp", "7pace-token")
+	write(pmMcp)
+	if got := def(home); got != pmMcp {
+		t.Errorf("com ~/.pm-mcp: %s", got)
+	}
+	write(current)
+	if got := def(home); got != current {
+		t.Errorf("com ~/.devpulse: %s", got)
 	}
 }
 

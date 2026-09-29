@@ -19,7 +19,7 @@ import (
 )
 
 // LogPrefix is prepended to every log line written to stderr.
-var LogPrefix = "[pm-mcp] "
+var LogPrefix = "[devpulse] "
 
 // Logf writes a log line to stderr (stdout carries the protocol).
 func Logf(format string, args ...any) {

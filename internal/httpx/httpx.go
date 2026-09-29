@@ -19,7 +19,7 @@ import (
 const MaxResponseBytes = 8 << 20 // 8 MiB is plenty for any page of results
 
 // UserAgent is sent with every request; main sets it to include the version.
-var UserAgent = "pm-mcp"
+var UserAgent = "devpulse"
 
 // NewHTTPClient returns a client that never follows redirects, so a
 // credential can only ever be sent to the host that was configured.

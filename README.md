@@ -1,4 +1,4 @@
-# pm-mcp (Go)
+# DevPulse
 
 Servidor MCP **local** que conecta clientes de IA (Claude Code, Claude Desktop, Cowork e qualquer cliente MCP) às suas **ferramentas de gestão de projetos**.
 
@@ -11,7 +11,7 @@ O servidor é organizado em **providers** (a ferramenta de gestão) e **componen
 
 Outras ferramentas (Jira, GitLab…) entram como um novo provider. Veja [Adicionando um provider](#adicionando-um-provider).
 
-Nasceu como `7pace-mcp`, uma reescrita em Go do [turnono/7pace-mcp-server](https://github.com/turnono/7pace-mcp-server) com foco em segurança e correção. Quem vem dessa versão deve ler a [migração](#migrando-do-7pace-mcp).
+Nasceu como `7pace-mcp`, uma reescrita em Go do [turnono/7pace-mcp-server](https://github.com/turnono/7pace-mcp-server) com foco em segurança e correção, e depois se chamou `pm-mcp`. Quem vem de uma dessas versões deve ler a [migração](#migrando-do-pm-mcp-ou-do-7pace-mcp).
 
 ## Por que esta versão é mais segura
 
@@ -29,7 +29,7 @@ Nasceu como `7pace-mcp`, uma reescrita em Go do [turnono/7pace-mcp-server](https
 | Exclusão | sempre disponível | desligada por padrão (`SEVENPACE_ENABLE_DELETE`) |
 | Somente leitura | não tem | `SEVENPACE_READ_ONLY` / `AZURE_DEVOPS_READ_ONLY` |
 | Edição concorrente no Boards | não tem | usa a revisão do item (`test /rev`): não sobrescreve alteração de outra pessoa |
-| Instalação | editar JSON à mão | `pm-mcp install`: faz backup, preserva o resto do arquivo e o token vai da área de transferência direto para um arquivo protegido |
+| Instalação | editar JSON à mão | `devpulse install`: faz backup, preserva o resto do arquivo e o token vai da área de transferência direto para um arquivo protegido |
 
 Bugs de API corrigidos, conforme a [documentação oficial da 7pace](https://github.com/7pace/timetracker-rest-api-samplecode):
 
@@ -77,18 +77,18 @@ Excluir work items não é suportado de propósito. Para isso, use `state: "Remo
 
 ```powershell
 # Windows (PowerShell), dentro da pasta do projeto
-go build -trimpath -ldflags "-s -w" -o pm-mcp.exe .
+go build -trimpath -ldflags "-s -w" -o devpulse.exe .
 ```
 
 ```bash
 # macOS / Linux
-go build -trimpath -ldflags "-s -w" -o pm-mcp .
+go build -trimpath -ldflags "-s -w" -o devpulse .
 ```
 
 ### 2. Rode o instalador
 
 ```bash
-./pm-mcp install
+./devpulse install
 ```
 
 O assistente faz isto:
@@ -99,12 +99,12 @@ O assistente faz isto:
 4. Pergunta a **ferramenta de gestão** e os **componentes** que você quer integrar.
 5. Pergunta só as configurações desses componentes, cada uma com um valor padrão. As opções avançadas (somente leitura, exclusão, time padrão, tempo limite…) ficam atrás de uma pergunta.
 6. Para cada token: se o arquivo não existe, mostra o passo a passo para gerá-lo (com o link da sua organização) e oferece criá-lo. **Copie o token (Ctrl+C) e tecle Enter.** O instalador lê a área de transferência, grava um arquivo que só você pode ler (`chmod 600` ou `icacls`) e limpa a área de transferência. O token nunca aparece na tela nem no histórico do terminal.
-7. Copia o executável para um lugar fixo: `%LOCALAPPDATA%\Programs\pm-mcp\` no Windows ou `~/.local/bin/` no macOS/Linux. Esse lugar também pode ser alterado.
+7. Copia o executável para um lugar fixo: `%LOCALAPPDATA%\Programs\devpulse\` no Windows ou `~/.local/bin/` no macOS/Linux. Esse lugar também pode ser alterado.
 8. Mostra um **resumo**, roda o `-check` com a configuração nova e só então grava. Antes de alterar um arquivo existente, faz backup dele (`*.bak-AAAAMMDD-HHMMSS`) e mantém tudo o que não é do servidor.
 
 Nos menus e nas perguntas de sim/não, navegue com as **setas**: ↑/↓ movem, **Espaço** marca nas listas de múltipla escolha, ←/→ alternam entre Sim e Não, **Enter** confirma e **Ctrl+C** cancela sem alterar nada. A linha de ajuda aparece embaixo de cada pergunta. Fora de um terminal (por exemplo, com a entrada vinda de um pipe), o instalador aceita as respostas digitadas por número.
 
-Se já existir uma instalação, os valores dela viram o padrão. Isso vale também para a entrada `7pace` antiga, e o instalador oferece removê-la.
+Se já existir uma instalação, os valores dela viram o padrão. Isso vale também para as entradas antigas `pm-mcp` e `7pace`, e o instalador oferece removê-las.
 
 Onde cada app é configurado:
 
@@ -118,22 +118,22 @@ Onde cada app é configurado:
 ### Outros comandos
 
 ```bash
-pm-mcp detect      # SO, apps detectados, arquivos de configuração e instalações existentes
-pm-mcp uninstall   # remove a entrada (com backup); não apaga o executável nem os tokens
-pm-mcp -check      # testa a configuração do ambiente atual
+devpulse detect      # SO, apps detectados, arquivos de configuração e instalações existentes
+devpulse uninstall   # remove a entrada (com backup); não apaga o executável nem os tokens
+devpulse -check      # testa a configuração do ambiente atual
 ```
 
 ### Modo não interativo
 
-Todas as perguntas têm uma flag equivalente. Com `--yes`, os valores padrão são aceitos sem perguntar. Veja `pm-mcp install -h`.
+Todas as perguntas têm uma flag equivalente. Com `--yes`, os valores padrão são aceitos sem perguntar. Veja `devpulse install -h`.
 
 ```bash
-pm-mcp install --yes --harness claude --app code,desktop --scope user \
+devpulse install --yes --harness claude --app code,desktop --scope user \
   --provider azuredevops --components boards,sevenpace \
   --set SEVENPACE_ORGANIZATION=minhaorg \
-  --set SEVENPACE_TOKEN_FILE=~/.pm-mcp/7pace-token \
+  --set SEVENPACE_TOKEN_FILE=~/.devpulse/7pace-token \
   --set AZURE_DEVOPS_ORG_URL=https://dev.azure.com/minhaorg \
-  --set AZURE_DEVOPS_PAT_FILE=~/.pm-mcp/azdo-pat \
+  --set AZURE_DEVOPS_PAT_FILE=~/.devpulse/azdo-pat \
   --set AZURE_DEVOPS_PROJECT="Meu Projeto"
 ```
 
@@ -142,7 +142,7 @@ pm-mcp install --yes --harness claude --app code,desktop --scope user \
 | `--dry-run` | Mostra tudo o que seria feito, sem gravar nada |
 | `--config <arquivo>` / `--key <a.b>` | Grava num arquivo e numa chave diferentes do padrão (ex.: `--harness generic --config ~/.cursor/mcp.json`) |
 | `--bin-dir <pasta>` / `--no-copy` | Muda o destino do executável, ou usa o executável de onde ele está |
-| `--name <nome>` | Nome da entrada (padrão `pm-mcp`) |
+| `--name <nome>` | Nome da entrada (padrão `devpulse`) |
 | `--advanced` | Pergunta também as opções avançadas |
 | `--force` | Substitui entradas existentes sem perguntar |
 | `--skip-check` | Não roda o `-check` antes de gravar |
@@ -167,7 +167,7 @@ Se preferir não usar o instalador:
 
    ```powershell
    # Windows: copie o token (Ctrl+C) e rode
-   $dir  = Join-Path $env:USERPROFILE ".pm-mcp"
+   $dir  = Join-Path $env:USERPROFILE ".devpulse"
    $file = Join-Path $dir "7pace-token"   # ou "azdo-pat"
    New-Item -ItemType Directory -Force $dir | Out-Null
    [IO.File]::WriteAllText($file, (Get-Clipboard -Raw).Trim())
@@ -177,7 +177,7 @@ Se preferir não usar o instalador:
 
    ```bash
    # macOS / Linux
-   mkdir -p ~/.pm-mcp && printf '%s' 'COLE_O_TOKEN_AQUI' > ~/.pm-mcp/7pace-token && chmod 600 ~/.pm-mcp/7pace-token
+   mkdir -p ~/.devpulse && printf '%s' 'COLE_O_TOKEN_AQUI' > ~/.devpulse/7pace-token && chmod 600 ~/.devpulse/7pace-token
    ```
 
 2. Adicione o servidor ao seu cliente. Este é o formato `mcpServers`, usado pelo Claude Desktop, pelo `.mcp.json` e pela maioria dos clientes:
@@ -185,13 +185,13 @@ Se preferir não usar o instalador:
    ```json
    {
      "mcpServers": {
-       "pm-mcp": {
-         "command": "C:\\Users\\SEU_USUARIO\\AppData\\Local\\Programs\\pm-mcp\\pm-mcp.exe",
+       "devpulse": {
+         "command": "C:\\Users\\SEU_USUARIO\\AppData\\Local\\Programs\\devpulse\\devpulse.exe",
          "env": {
            "SEVENPACE_ORGANIZATION": "minhaorg",
-           "SEVENPACE_TOKEN_FILE": "C:\\Users\\SEU_USUARIO\\.pm-mcp\\7pace-token",
+           "SEVENPACE_TOKEN_FILE": "C:\\Users\\SEU_USUARIO\\.devpulse\\7pace-token",
            "AZURE_DEVOPS_ORG_URL": "https://dev.azure.com/minhaorg",
-           "AZURE_DEVOPS_PAT_FILE": "C:\\Users\\SEU_USUARIO\\.pm-mcp\\azdo-pat",
+           "AZURE_DEVOPS_PAT_FILE": "C:\\Users\\SEU_USUARIO\\.devpulse\\azdo-pat",
            "AZURE_DEVOPS_PROJECT": "Meu Projeto"
          }
        }
@@ -199,7 +199,7 @@ Se preferir não usar o instalador:
    }
    ```
 
-3. Teste com `pm-mcp -check` usando as mesmas variáveis. A saída esperada é parecida com esta:
+3. Teste com `devpulse -check` usando as mesmas variáveis. A saída esperada é parecida com esta:
 
    ```
    Azure DevOps: https://dev.azure.com/minhaorg
@@ -241,13 +241,16 @@ Um componente é ativado quando suas variáveis obrigatórias estão definidas. 
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `PM_MCP_HTTP_TIMEOUT` | não | Tempo limite por requisição (padrão `30s`, máx. `5m`). `SEVENPACE_HTTP_TIMEOUT` continua aceito. |
+| `DEVPULSE_HTTP_TIMEOUT` | não | Tempo limite por requisição (padrão `30s`, máx. `5m`). Os nomes antigos `PM_MCP_HTTP_TIMEOUT` e `SEVENPACE_HTTP_TIMEOUT` continuam aceitos. |
 
-## Migrando do 7pace-mcp
+## Migrando do pm-mcp ou do 7pace-mcp
 
-- As variáveis de ambiente e os nomes das tools não mudaram. Uma config antiga funciona trocando só o `command` pelo novo executável.
-- O jeito mais fácil é rodar `pm-mcp install`. Ele encontra a entrada `7pace`, usa os valores dela como padrão, cria a entrada `pm-mcp` e oferece remover a antiga. Se a config antiga tinha o token direto no JSON, ele oferece mover o token para um arquivo protegido.
-- `SEVENPACE_HTTP_TIMEOUT` vira `PM_MCP_HTTP_TIMEOUT`, mas o nome antigo continua funcionando.
+- As variáveis dos componentes e os nomes das tools não mudaram. Uma config antiga funciona trocando só o `command` pelo novo executável.
+- O jeito mais fácil é rodar `devpulse install`. Ele encontra as entradas antigas (`pm-mcp` e `7pace`), usa os valores delas como padrão, cria a entrada `devpulse` e oferece remover as antigas. Se a config antiga tinha o token direto no JSON, ele oferece mover o token para um arquivo protegido.
+- Os arquivos de token existentes continuam sendo usados onde estão (`~/.pm-mcp/`, `~/.7pace/`); não é preciso gerar tokens novos. Instalações novas usam `~/.devpulse/`.
+- O executável antigo (ex.: `%LOCALAPPDATA%\Programs\pm-mcp\pm-mcp.exe`) não é apagado. O instalador avisa quando ele deixa de ser usado; apague-o se nenhum outro app o usa.
+- `PM_MCP_HTTP_TIMEOUT` e `SEVENPACE_HTTP_TIMEOUT` viram `DEVPULSE_HTTP_TIMEOUT`, mas os nomes antigos continuam funcionando.
+- `devpulse uninstall` e `devpulse detect` também encontram as entradas antigas.
 
 ## Exemplos de uso (é só conversar)
 

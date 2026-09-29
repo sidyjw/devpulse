@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sidiney/pm-mcp/internal/httpx"
+	"github.com/sidiney/devpulse/internal/httpx"
 )
 
 // 7pace Timetracker REST API v3.

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sidiney/pm-mcp/internal/httpx"
+	"github.com/sidiney/devpulse/internal/httpx"
 )
 
 // Azure DevOps (Boards) client: projects, teams, sprints, work items.

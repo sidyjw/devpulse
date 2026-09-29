@@ -1,13 +1,13 @@
-// Command pm-mcp is a local MCP server (stdio) for project-management tools.
+// Command devpulse is a local MCP server (stdio) for project-management tools.
 // Each tool is a provider with independent components (today: Azure DevOps
 // with Boards and 7pace Timetracker). Standard library only; no telemetry;
 // talks only to the hosts you configure.
 //
-//	pm-mcp                 serve MCP over stdio
-//	pm-mcp -check          validate the configuration and test connections
-//	pm-mcp install         guided installation into an AI harness
-//	pm-mcp uninstall       remove it from a harness
-//	pm-mcp detect          show the OS, harnesses and existing installations
+//	devpulse                 serve MCP over stdio
+//	devpulse -check          validate the configuration and test connections
+//	devpulse install         guided installation into an AI harness
+//	devpulse uninstall       remove it from a harness
+//	devpulse detect          show the OS, harnesses and existing installations
 package main
 
 import (
@@ -19,16 +19,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sidiney/pm-mcp/internal/httpx"
-	"github.com/sidiney/pm-mcp/internal/install"
-	"github.com/sidiney/pm-mcp/internal/mcp"
-	"github.com/sidiney/pm-mcp/internal/provider"
-	"github.com/sidiney/pm-mcp/internal/providers"
-	"github.com/sidiney/pm-mcp/internal/settings"
+	"github.com/sidiney/devpulse/internal/httpx"
+	"github.com/sidiney/devpulse/internal/install"
+	"github.com/sidiney/devpulse/internal/mcp"
+	"github.com/sidiney/devpulse/internal/provider"
+	"github.com/sidiney/devpulse/internal/providers"
+	"github.com/sidiney/devpulse/internal/settings"
 )
 
 const (
-	name    = "pm-mcp"
+	name    = "devpulse"
 	version = "2.0.0"
 )
 

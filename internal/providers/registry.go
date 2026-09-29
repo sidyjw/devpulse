@@ -4,8 +4,8 @@
 package providers
 
 import (
-	"github.com/sidiney/pm-mcp/internal/provider"
-	"github.com/sidiney/pm-mcp/internal/providers/azuredevops"
+	"github.com/sidiney/devpulse/internal/provider"
+	"github.com/sidiney/devpulse/internal/providers/azuredevops"
 )
 
 // All returns the providers in the order the installer shows them.

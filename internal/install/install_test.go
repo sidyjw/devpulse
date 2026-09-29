@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sidiney/pm-mcp/internal/provider"
-	"github.com/sidiney/pm-mcp/internal/providers/azuredevops"
+	"github.com/sidiney/devpulse/internal/provider"
+	"github.com/sidiney/devpulse/internal/providers/azuredevops"
 )
 
 // ---------- helpers ----------
@@ -55,7 +55,7 @@ func fakeEnv(t *testing.T, goos string) (*Env, *recorder) {
 		LocalAppData: filepath.Join(root, "localappdata"),
 		XDGConfig:    filepath.Join(root, "home", ".config"),
 		Cwd:          filepath.Join(root, "proj"),
-		Exe:          filepath.Join(root, "build", "pm-mcp.exe"),
+		Exe:          filepath.Join(root, "build", "devpulse.exe"),
 		Getenv: func(k string) string {
 			if k == "USERNAME" {
 				return "tester"
@@ -95,7 +95,7 @@ func readJSON(t *testing.T, path string) map[string]any {
 	return m
 }
 
-var testBuild = Build{Name: "pm-mcp", Version: "test", Providers: []provider.Provider{azuredevops.Provider()}}
+var testBuild = Build{Name: "devpulse", Version: "test", Providers: []provider.Provider{azuredevops.Provider()}}
 
 func runCLI(t *testing.T, e *Env, stdin string, args ...string) (int, string) {
 	t.Helper()
@@ -110,7 +110,7 @@ func TestUpsertPreservesOtherKeysAndOrder(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "cfg.json")
 	writeFile(t, p, `{"preferences":{"theme":"dark"},"mcpServers":{"other":{"command":"x"}},"zeta":1}`)
 
-	res, err := UpsertEntry(p, []string{"mcpServers"}, "pm-mcp", map[string]any{"command": "/bin/pm"}, false)
+	res, err := UpsertEntry(p, []string{"mcpServers"}, "devpulse", map[string]any{"command": "/bin/pm"}, false)
 	must(t, err)
 	if !res.Changed || res.Backup == "" || !exists(res.Backup) {
 		t.Fatalf("res = %+v", res)
@@ -122,7 +122,7 @@ func TestUpsertPreservesOtherKeysAndOrder(t *testing.T) {
 	}
 	m := readJSON(t, p)
 	servers := m["mcpServers"].(map[string]any)
-	if servers["other"] == nil || servers["pm-mcp"].(map[string]any)["command"] != "/bin/pm" {
+	if servers["other"] == nil || servers["devpulse"].(map[string]any)["command"] != "/bin/pm" {
 		t.Errorf("servers = %v", servers)
 	}
 	if m["preferences"].(map[string]any)["theme"] != "dark" {
@@ -130,30 +130,30 @@ func TestUpsertPreservesOtherKeysAndOrder(t *testing.T) {
 	}
 
 	// idempotent
-	res, err = UpsertEntry(p, []string{"mcpServers"}, "pm-mcp", map[string]any{"command": "/bin/pm"}, false)
+	res, err = UpsertEntry(p, []string{"mcpServers"}, "devpulse", map[string]any{"command": "/bin/pm"}, false)
 	must(t, err)
 	if res.Changed {
 		t.Error("segunda gravação idêntica não deveria alterar o arquivo")
 	}
 
-	res, err = RemoveEntry(p, []string{"mcpServers"}, "pm-mcp", false)
+	res, err = RemoveEntry(p, []string{"mcpServers"}, "devpulse", false)
 	must(t, err)
-	if !res.Changed || readJSON(t, p)["mcpServers"].(map[string]any)["pm-mcp"] != nil {
+	if !res.Changed || readJSON(t, p)["mcpServers"].(map[string]any)["devpulse"] != nil {
 		t.Error("remoção falhou")
 	}
 }
 
 func TestUpsertCreatesFileAndNestedKeys(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "sub", "claude.json")
-	_, err := UpsertEntry(p, []string{"projects", "C:/x/y", "mcpServers"}, "pm-mcp", map[string]any{"command": "c"}, false)
+	_, err := UpsertEntry(p, []string{"projects", "C:/x/y", "mcpServers"}, "devpulse", map[string]any{"command": "c"}, false)
 	must(t, err)
 	m := readJSON(t, p)
-	got := m["projects"].(map[string]any)["C:/x/y"].(map[string]any)["mcpServers"].(map[string]any)["pm-mcp"]
+	got := m["projects"].(map[string]any)["C:/x/y"].(map[string]any)["mcpServers"].(map[string]any)["devpulse"]
 	if got == nil {
 		t.Fatalf("entrada aninhada ausente: %v", m)
 	}
 	entries, err := ReadEntries(p, []string{"projects", "C:/x/y", "mcpServers"})
-	if err != nil || entries["pm-mcp"].Command != "c" {
+	if err != nil || entries["devpulse"].Command != "c" {
 		t.Errorf("ReadEntries = %v, %v", entries, err)
 	}
 }
@@ -230,8 +230,8 @@ func TestClaudeCodeUsesCLIWhenSafe(t *testing.T) {
 	e.LookPath = func(string) (string, error) { return "/usr/local/bin/claude", nil }
 	c := claudeCode{}
 	tg := c.Target(e, "user")
-	writeFile(t, tg.Path, `{"mcpServers":{"pm-mcp":{"command":"old"}}}`)
-	spec := Spec{Name: "pm-mcp", Command: "/opt/pm-mcp", Env: map[string]string{"A": "1"}}
+	writeFile(t, tg.Path, `{"mcpServers":{"devpulse":{"command":"old"}}}`)
+	spec := Spec{Name: "devpulse", Command: "/opt/devpulse", Env: map[string]string{"A": "1"}}
 	var out bytes.Buffer
 	must(t, c.Install(context.Background(), e, tg, spec, Opts{Out: &out}))
 	calls := rec.named("claude")
@@ -240,10 +240,10 @@ func TestClaudeCodeUsesCLIWhenSafe(t *testing.T) {
 	}
 	var entry map[string]any
 	must(t, json.Unmarshal([]byte(calls[1].Args[3]), &entry))
-	if entry["type"] != "stdio" || entry["command"] != "/opt/pm-mcp" || calls[1].Args[5] != "user" {
+	if entry["type"] != "stdio" || entry["command"] != "/opt/devpulse" || calls[1].Args[5] != "user" {
 		t.Errorf("add-json = %v %v", entry, calls[1].Args)
 	}
-	if readJSON(t, tg.Path)["mcpServers"].(map[string]any)["pm-mcp"].(map[string]any)["command"] != "old" {
+	if readJSON(t, tg.Path)["mcpServers"].(map[string]any)["devpulse"].(map[string]any)["command"] != "old" {
 		t.Error("com o CLI disponível o arquivo não deveria ser editado diretamente")
 	}
 
@@ -255,7 +255,7 @@ func TestClaudeCodeUsesCLIWhenSafe(t *testing.T) {
 	if len(rec2.named("claude.cmd")) != 0 {
 		t.Error("não deveria executar claude.cmd")
 	}
-	if readJSON(t, tg2.Path)["mcpServers"].(map[string]any)["pm-mcp"].(map[string]any)["type"] != "stdio" {
+	if readJSON(t, tg2.Path)["mcpServers"].(map[string]any)["devpulse"].(map[string]any)["type"] != "stdio" {
 		t.Error("entrada do Claude Code deveria ter type=stdio")
 	}
 }
@@ -272,7 +272,7 @@ func TestInstallNonInteractiveMigratesLegacy(t *testing.T) {
 	rec.reply = func(c Cmd) (string, error) { return "7pace: ok\n", nil }
 
 	code, out := runCLI(t, e, "", "install", "--yes", "--harness", "claude", "--app", "desktop,cowork",
-		"--bin-dir", filepath.Join(e.LocalAppData, "Programs", "pm-mcp"))
+		"--bin-dir", filepath.Join(e.LocalAppData, "Programs", "devpulse"))
 	if code != 0 {
 		t.Fatalf("code=%d\n%s", code, out)
 	}
@@ -284,15 +284,15 @@ func TestInstallNonInteractiveMigratesLegacy(t *testing.T) {
 	if servers["7pace"] != nil {
 		t.Errorf("entrada antiga deveria ter sido removida: %v", servers)
 	}
-	entry := servers["pm-mcp"].(map[string]any)
+	entry := servers["devpulse"].(map[string]any)
 	env := entry["env"].(map[string]any)
-	if env["SEVENPACE_ORGANIZATION"] != "velha" || env["SEVENPACE_TOKEN_FILE"] != tok || env["MINHA_VAR"] != "x" || env["PM_MCP_HTTP_TIMEOUT"] != "45s" {
+	if env["SEVENPACE_ORGANIZATION"] != "velha" || env["SEVENPACE_TOKEN_FILE"] != tok || env["MINHA_VAR"] != "x" || env["DEVPULSE_HTTP_TIMEOUT"] != "45s" {
 		t.Errorf("env = %v", env)
 	}
 	if env["SEVENPACE_HTTP_TIMEOUT"] != nil || env["AZURE_DEVOPS_ORG_URL"] != nil {
 		t.Errorf("variáveis inesperadas: %v", env)
 	}
-	wantBin := filepath.Join(e.LocalAppData, "Programs", "pm-mcp", "pm-mcp.exe")
+	wantBin := filepath.Join(e.LocalAppData, "Programs", "devpulse", "devpulse.exe")
 	if entry["command"] != wantBin || !exists(wantBin) {
 		t.Errorf("command = %v", entry["command"])
 	}
@@ -300,13 +300,60 @@ func TestInstallNonInteractiveMigratesLegacy(t *testing.T) {
 		t.Error("preferences perdido")
 	}
 	// -check ran with the new env and without inherited secrets
-	checks := rec.named("pm-mcp.exe")
+	checks := rec.named("devpulse.exe")
 	if len(checks) != 1 || checks[0].Args[0] != "-check" {
 		t.Fatalf("check = %+v", rec.calls)
 	}
 	joined := strings.Join(checks[0].Env, "\n")
 	if strings.Contains(joined, "nao-pode-vazar") || !strings.Contains(joined, "SEVENPACE_ORGANIZATION=velha") || !strings.Contains(joined, "PATH=/bin") {
 		t.Errorf("env do -check = %v", checks[0].Env)
+	}
+}
+
+func TestInstallMigratesPmMcp(t *testing.T) {
+	e, rec := fakeEnv(t, "windows")
+	cfg := filepath.Join(e.AppData, "Claude", "claude_desktop_config.json")
+	tok := filepath.Join(e.Home, ".pm-mcp", "7pace-token")
+	oldBin := filepath.Join(e.LocalAppData, "Programs", "pm-mcp", "pm-mcp.exe")
+	writeFile(t, tok, "segredo")
+	writeFile(t, oldBin, "binary")
+	writeFile(t, cfg, `{"mcpServers":{"pm-mcp":{"command":`+jsonStr(oldBin)+`,"env":{
+		"SEVENPACE_ORGANIZATION":"org","SEVENPACE_TOKEN_FILE":`+jsonStr(tok)+`,"PM_MCP_HTTP_TIMEOUT":"45s"}}}}`)
+	rec.reply = func(c Cmd) (string, error) { return "7pace: ok\n", nil }
+
+	code, out := runCLI(t, e, "", "install", "--yes", "--harness", "claude", "--app", "desktop")
+	if code != 0 {
+		t.Fatalf("code=%d\n%s", code, out)
+	}
+	servers := readJSON(t, cfg)["mcpServers"].(map[string]any)
+	if servers["pm-mcp"] != nil {
+		t.Errorf("entrada pm-mcp deveria ter sido removida: %v", servers)
+	}
+	entry := servers["devpulse"].(map[string]any)
+	env := entry["env"].(map[string]any)
+	if env["SEVENPACE_ORGANIZATION"] != "org" || env["SEVENPACE_TOKEN_FILE"] != tok || env["DEVPULSE_HTTP_TIMEOUT"] != "45s" || env["PM_MCP_HTTP_TIMEOUT"] != nil {
+		t.Errorf("env = %v", env)
+	}
+	if want := filepath.Join(e.LocalAppData, "Programs", "devpulse", "devpulse.exe"); entry["command"] != want {
+		t.Errorf("command = %v", entry["command"])
+	}
+	if !strings.Contains(out, "versão antiga") || !strings.Contains(out, oldBin) {
+		t.Errorf("deveria indicar a migração e o executável antigo:\n%s", out)
+	}
+}
+
+func TestUninstallFindsLegacyEntries(t *testing.T) {
+	e, _ := fakeEnv(t, "windows")
+	cfg := filepath.Join(e.AppData, "Claude", "claude_desktop_config.json")
+	writeFile(t, cfg, `{"mcpServers":{"pm-mcp":{"command":"a"},"7pace":{"command":"b"},"outro":{"command":"c"}}}`)
+
+	code, out := runCLI(t, e, "", "uninstall", "--yes", "--harness", "claude", "--app", "desktop")
+	if code != 0 {
+		t.Fatalf("code=%d\n%s", code, out)
+	}
+	servers := readJSON(t, cfg)["mcpServers"].(map[string]any)
+	if servers["pm-mcp"] != nil || servers["7pace"] != nil || servers["outro"] == nil {
+		t.Errorf("servers = %v", servers)
 	}
 }
 
@@ -353,14 +400,14 @@ func TestInstallInteractive(t *testing.T) {
 	if exists(cfg) {
 		t.Error("o caminho padrão não deveria ser usado quando o usuário troca o arquivo")
 	}
-	env := readJSON(t, custom)["mcpServers"].(map[string]any)["pm-mcp"].(map[string]any)["env"].(map[string]any)
+	env := readJSON(t, custom)["mcpServers"].(map[string]any)["devpulse"].(map[string]any)["env"].(map[string]any)
 	if env["SEVENPACE_ORGANIZATION"] != "minhaorg" || env["SEVENPACE_TOKEN_FILE"] != tokFile || env["SEVENPACE_READ_ONLY"] != "true" {
 		t.Errorf("env = %v", env)
 	}
 	if _, ok := env["SEVENPACE_ENABLE_DELETE"]; ok {
 		t.Error("bool falso não deveria ser gravado")
 	}
-	if _, ok := env["PM_MCP_HTTP_TIMEOUT"]; ok {
+	if _, ok := env["DEVPULSE_HTTP_TIMEOUT"]; ok {
 		t.Error("timeout padrão não deveria ser gravado")
 	}
 	b, err := os.ReadFile(tokFile)
@@ -392,7 +439,7 @@ func TestInstallDryRunWritesNothing(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code=%d\n%s", code, out)
 	}
-	if exists(filepath.Join(e.XDGConfig, "Claude", "claude_desktop_config.json")) || exists(filepath.Join(e.Home, ".local", "bin", "pm-mcp")) {
+	if exists(filepath.Join(e.XDGConfig, "Claude", "claude_desktop_config.json")) || exists(filepath.Join(e.Home, ".local", "bin", "devpulse")) {
 		t.Error("dry-run gravou algo")
 	}
 	if len(rec.calls) != 0 {
@@ -435,7 +482,7 @@ func TestGenericPrintsSnippets(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code=%d\n%s", code, out)
 	}
-	for _, want := range []string{`"mcpServers"`, `"servers"`, "[mcp_servers.pm-mcp]", `AZURE_DEVOPS_PAT_FILE = ` + tomlString(filepath.Join(e.Home, "p"))} {
+	for _, want := range []string{`"mcpServers"`, `"servers"`, "[mcp_servers.devpulse]", `AZURE_DEVOPS_PAT_FILE = ` + tomlString(filepath.Join(e.Home, "p"))} {
 		if !strings.Contains(out, want) {
 			t.Errorf("saída sem %q:\n%s", want, out)
 		}
@@ -451,11 +498,11 @@ func TestGenericWritesCustomFileAndUninstall(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code=%d\n%s", code, out)
 	}
-	if readJSON(t, p)["mcpServers"].(map[string]any)["pm-mcp"] == nil {
+	if readJSON(t, p)["mcpServers"].(map[string]any)["devpulse"] == nil {
 		t.Fatal("entrada não gravada")
 	}
 	code, out = runCLI(t, e, "", append([]string{"uninstall"}, args...)...)
-	if code != 0 || readJSON(t, p)["mcpServers"].(map[string]any)["pm-mcp"] != nil {
+	if code != 0 || readJSON(t, p)["mcpServers"].(map[string]any)["devpulse"] != nil {
 		t.Fatalf("uninstall falhou (%d):\n%s", code, out)
 	}
 }
@@ -507,7 +554,7 @@ func TestCheckToken(t *testing.T) {
 
 func TestWriteSecretFilePermissions(t *testing.T) {
 	e, _ := fakeEnv(t, "linux")
-	p := filepath.Join(e.Home, ".pm-mcp", "tok")
+	p := filepath.Join(e.Home, ".devpulse", "tok")
 	must(t, WriteSecretFile(context.Background(), e, p, "s3cr3t"))
 	fi, err := os.Stat(p)
 	must(t, err)

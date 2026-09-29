@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sidiney/pm-mcp/internal/mcp"
-	"github.com/sidiney/pm-mcp/internal/provider"
-	"github.com/sidiney/pm-mcp/internal/settings"
-	"github.com/sidiney/pm-mcp/internal/ui"
+	"github.com/sidiney/devpulse/internal/mcp"
+	"github.com/sidiney/devpulse/internal/provider"
+	"github.com/sidiney/devpulse/internal/settings"
+	"github.com/sidiney/devpulse/internal/ui"
 )
 
 const (
@@ -35,18 +35,26 @@ func Provider() provider.Provider {
 	}
 }
 
-// secretDefault suggests ~/.pm-mcp/<name>, or the legacy ~/.7pace/<legacy>
-// when that file already exists.
+// secretDefault suggests ~/.devpulse/<name>. When that file does not exist
+// but one from an earlier version does (~/.pm-mcp/<name> or
+// ~/.7pace/<legacy>), it suggests that one, so the token is reused instead
+// of asked again.
 func secretDefault(name, legacy string) func(string) string {
 	return func(home string) string {
 		if home == "" {
 			return ""
 		}
-		old := filepath.Join(home, ".7pace", legacy)
-		if fi, err := os.Stat(old); err == nil && fi.Mode().IsRegular() {
-			return old
+		current := filepath.Join(home, ".devpulse", name)
+		for _, p := range []string{
+			current,
+			filepath.Join(home, ".pm-mcp", name),
+			filepath.Join(home, ".7pace", legacy),
+		} {
+			if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() {
+				return p
+			}
 		}
-		return filepath.Join(home, ".pm-mcp", name)
+		return current
 	}
 }
 
@@ -93,7 +101,7 @@ func boardsComponent() provider.Component {
 					Title: "Como gerar o PAT (Personal Access Token) do Azure DevOps",
 					Steps: []string{
 						"Abra {AZURE_DEVOPS_ORG_URL|https://dev.azure.com/<sua-org>}/_usersSettings/tokens (ou, no Azure DevOps: ícone de usuário no canto superior direito → Personal access tokens).",
-						"Clique em New Token, dê um nome (ex.: pm-mcp) e escolha a organização e a validade.",
+						"Clique em New Token, dê um nome (ex.: devpulse) e escolha a organização e a validade.",
 						"Em Scopes, escolha Custom defined e marque: Work Items → Read & write; Project and Team → Read (use Show all scopes se algum não aparecer). Para uso somente leitura, Work Items → Read basta.",
 						"Clique em Create e copie o token: ele só é mostrado uma vez.",
 					},
@@ -218,7 +226,7 @@ func sevenPaceComponent() provider.Component {
 					Steps: []string{
 						"Abra o 7pace em https://{SEVENPACE_ORGANIZATION|<org>}.timehub.7pace.com (ou pela aba Timetracker dentro do Azure DevOps).",
 						"Vá em Settings (ícone de engrenagem) → API & Reporting.",
-						"Crie um novo token (Create New Token) com um nome como pm-mcp.",
+						"Crie um novo token (Create New Token) com um nome como devpulse.",
 						"Copie o token: ele só é mostrado uma vez. Se a opção não aparecer, peça ao administrador do 7pace acesso à API.",
 					},
 				}},

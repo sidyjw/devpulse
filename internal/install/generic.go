@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sidiney/pm-mcp/internal/ui"
+	"github.com/sidiney/devpulse/internal/ui"
 )
 
 // genericHarness covers any client not in the registry. Without --config it

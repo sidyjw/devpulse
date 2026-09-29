@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sidiney/pm-mcp/internal/httpx"
-	"github.com/sidiney/pm-mcp/internal/mcp"
-	"github.com/sidiney/pm-mcp/internal/mcp/mcptest"
+	"github.com/sidiney/devpulse/internal/httpx"
+	"github.com/sidiney/devpulse/internal/mcp"
+	"github.com/sidiney/devpulse/internal/mcp/mcptest"
 )
 
 const pat = "my-azdo-pat-xyz"

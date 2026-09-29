@@ -18,7 +18,7 @@ import (
 
 // Warnf reports a non-fatal configuration problem (stderr by default).
 var Warnf = func(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "[pm-mcp] aviso: "+format+"\n", args...)
+	fmt.Fprintf(os.Stderr, "[devpulse] aviso: "+format+"\n", args...)
 }
 
 // ValidateHTTPSURL requires an absolute https URL without credentials,
@@ -112,10 +112,13 @@ func CheckBool(v string) error {
 
 // Timeout global settings.
 const (
-	HTTPTimeoutEnv       = "PM_MCP_HTTP_TIMEOUT"
-	legacyHTTPTimeoutEnv = "SEVENPACE_HTTP_TIMEOUT"
-	DefaultHTTPTimeout   = 30 * time.Second
+	HTTPTimeoutEnv     = "DEVPULSE_HTTP_TIMEOUT"
+	DefaultHTTPTimeout = 30 * time.Second
 )
+
+// LegacyHTTPTimeoutEnvs are the names used by pm-mcp and 7pace-mcp, still
+// accepted (in this order of preference) when HTTPTimeoutEnv is not set.
+var LegacyHTTPTimeoutEnvs = []string{"PM_MCP_HTTP_TIMEOUT", "SEVENPACE_HTTP_TIMEOUT"}
 
 // ParseTimeout validates a per-request timeout (e.g. "30s", max 5m).
 func ParseTimeout(v string) (time.Duration, error) {
@@ -126,9 +129,9 @@ func ParseTimeout(v string) (time.Duration, error) {
 	return d, nil
 }
 
-// HTTPTimeout reads PM_MCP_HTTP_TIMEOUT (or the legacy SEVENPACE_HTTP_TIMEOUT).
+// HTTPTimeout reads DEVPULSE_HTTP_TIMEOUT (or one of the legacy names).
 func HTTPTimeout(getenv func(string) string) (time.Duration, error) {
-	for _, name := range []string{HTTPTimeoutEnv, legacyHTTPTimeoutEnv} {
+	for _, name := range append([]string{HTTPTimeoutEnv}, LegacyHTTPTimeoutEnvs...) {
 		if v := strings.TrimSpace(getenv(name)); v != "" {
 			d, err := ParseTimeout(v)
 			if err != nil {

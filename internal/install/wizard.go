@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sidiney/pm-mcp/internal/provider"
-	"github.com/sidiney/pm-mcp/internal/settings"
-	"github.com/sidiney/pm-mcp/internal/ui"
+	"github.com/sidiney/devpulse/internal/provider"
+	"github.com/sidiney/devpulse/internal/settings"
+	"github.com/sidiney/devpulse/internal/ui"
 )
 
 type wizard struct {
@@ -263,10 +263,13 @@ func (w *wizard) findExisting(ts []Target, names ...string) []found {
 }
 
 func (w *wizard) knownNames() []string {
-	if w.o.name == LegacyName {
-		return []string{w.o.name}
+	names := []string{w.o.name}
+	for _, n := range LegacyNames {
+		if n != w.o.name {
+			names = append(names, n)
+		}
 	}
-	return []string{w.o.name, LegacyName}
+	return names
 }
 
 // ---------- tool, components and settings ----------
@@ -274,7 +277,10 @@ func (w *wizard) knownNames() []string {
 // ownedEnv lists every variable the installer manages; any other variable
 // already present in an existing entry is kept as is.
 func ownedEnv(ps []provider.Provider) map[string]bool {
-	m := map[string]bool{"SEVENPACE_HTTP_TIMEOUT": true}
+	m := map[string]bool{}
+	for _, k := range settings.LegacyHTTPTimeoutEnvs {
+		m[k] = true
+	}
 	add := func(ss []provider.Setting) {
 		for _, s := range ss {
 			m[s.Env] = true
@@ -385,9 +391,11 @@ func (w *wizard) collectSettings(comps []provider.Component, prefill map[string]
 			return nil, fmt.Errorf("--set %s: variável desconhecida", k)
 		}
 	}
-	// the legacy timeout name becomes the new one
-	if v := prefill["SEVENPACE_HTTP_TIMEOUT"]; v != "" && prefill["PM_MCP_HTTP_TIMEOUT"] == "" {
-		prefill["PM_MCP_HTTP_TIMEOUT"] = v
+	// a legacy timeout name becomes the new one
+	for _, k := range settings.LegacyHTTPTimeoutEnvs {
+		if v := prefill[k]; v != "" && prefill[settings.HTTPTimeoutEnv] == "" {
+			prefill[settings.HTTPTimeoutEnv] = v
+		}
 	}
 
 	var advanced []provider.Setting
@@ -437,8 +445,8 @@ func (w *wizard) collectSettings(comps []provider.Component, prefill map[string]
 		}
 	}
 	// drop the default timeout: it is the server default anyway
-	if env["PM_MCP_HTTP_TIMEOUT"] == "30s" {
-		delete(env, "PM_MCP_HTTP_TIMEOUT")
+	if env[settings.HTTPTimeoutEnv] == "30s" {
+		delete(env, settings.HTTPTimeoutEnv)
 	}
 	return env, nil
 }
@@ -746,7 +754,11 @@ func (w *wizard) install() error {
 	if len(existing) > 0 {
 		w.printf("\n%s\n", w.c.Yellow("Instalação existente encontrada:"))
 		for _, f := range existing {
-			w.printf("  %s %s em %s\n", w.c.Yellow("•"), w.c.Bold(fmt.Sprintf("%q", f.name)), f.t.Path)
+			old := ""
+			if f.name != w.o.name && isLegacy(f.name) {
+				old = w.c.Dim(fmt.Sprintf(" (versão antiga: será migrada para %q)", w.o.name))
+			}
+			w.printf("  %s %s em %s%s\n", w.c.Yellow("•"), w.c.Bold(fmt.Sprintf("%q", f.name)), f.t.Path, old)
 		}
 		if len(prefill) > 0 {
 			w.note("Os valores atuais serão usados como padrão.")
@@ -887,16 +899,22 @@ func (w *wizard) install() error {
 			continue
 		}
 		for _, f := range existing {
-			if f.t.Key() == t.Key() && f.name == LegacyName && spec.Name != LegacyName {
-				rm, err := w.p.Confirm(fmt.Sprintf("  Remover a entrada antiga %q (7pace-mcp)?", LegacyName), true)
-				if err != nil {
-					return err
-				}
-				if rm {
-					if _, err := t.App.Uninstall(w.ctx, w.e, t, LegacyName, o); err != nil {
-						w.status("  ✗ %v", err)
-					}
-				}
+			if f.t.Key() != t.Key() || f.name == spec.Name || !isLegacy(f.name) {
+				continue
+			}
+			rm, err := w.p.Confirm(fmt.Sprintf("  Remover a entrada antiga %q?", f.name), true)
+			if err != nil {
+				return err
+			}
+			if !rm {
+				continue
+			}
+			if _, err := t.App.Uninstall(w.ctx, w.e, t, f.name, o); err != nil {
+				w.status("  ✗ %v", err)
+				continue
+			}
+			if old := f.entry.Command; old != "" && exists(old) && !samePath(w.e, old, spec.Command) {
+				w.note("  O executável antigo %s não é mais usado por esta entrada; apague-o se nenhum outro app o usa.", old)
 			}
 		}
 	}
@@ -975,7 +993,7 @@ func quoteAll(ss []string) []string {
 
 func (w *wizard) detect() {
 	w.printf("%s\n%s\n%s\n", w.c.Title(w.b.Name, w.b.Version, ""), w.c.Field("Sistema", w.e.Describe()), w.c.Field("Executável atual", w.e.Exe))
-	names := []string{w.b.Name, LegacyName}
+	names := append([]string{w.b.Name}, LegacyNames...)
 	for _, h := range Harnesses() {
 		if h.ID() == "generic" {
 			continue
@@ -1013,7 +1031,7 @@ func (w *wizard) detect() {
 					for _, n := range names {
 						if e, ok := entries[n]; ok {
 							s := fmt.Sprintf("%q → %s", n, e.Command)
-							if n == LegacyName {
+							if isLegacy(n) {
 								s += " (antiga)"
 							}
 							got = append(got, s)

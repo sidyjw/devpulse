@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/sidiney/pm-mcp/internal/mcp"
+	"github.com/sidiney/devpulse/internal/mcp"
 )
 
 // SettingKind tells the installer how to ask for and store a value.
@@ -110,7 +110,7 @@ type Active struct {
 
 // GlobalSettings are read by the server itself, not by a component.
 var GlobalSettings = []Setting{{
-	Env:      "PM_MCP_HTTP_TIMEOUT",
+	Env:      "DEVPULSE_HTTP_TIMEOUT",
 	Label:    "Tempo limite por requisição HTTP",
 	Help:     "ex.: 30s (máx. 5m)",
 	Kind:     Duration,
@@ -164,7 +164,7 @@ func describeAll(ps []Provider) string {
 		}
 	}
 	return "defina as variáveis de ao menos um componente: " + strings.Join(parts, "; ") +
-		". Dica: rode `pm-mcp install`"
+		". Dica: rode `devpulse install`"
 }
 
 // Find returns the provider and component with these ids.
