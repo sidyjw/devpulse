@@ -429,6 +429,39 @@ func TestInstallInteractive(t *testing.T) {
 	if !cleared {
 		t.Error("a área de transferência deveria ser limpa")
 	}
+	// the token guide is always shown, before the path question, once
+	title, question := "Como gerar o token da API do 7pace", "Arquivo com o token do 7pace"
+	if n := strings.Count(out, title); n != 1 {
+		t.Errorf("guia do token apareceu %d vezes:\n%s", n, out)
+	}
+	if strings.Index(out, title) > strings.Index(out, question) {
+		t.Errorf("o guia deveria aparecer antes da pergunta:\n%s", out)
+	}
+}
+
+func TestSecretGuideShownWhenFileExists(t *testing.T) {
+	e, _ := fakeEnv(t, "linux")
+	writeFile(t, filepath.Join(e.Home, ".devpulse", "azdo-pat"), "segredo")
+	code, out := runCLI(t, e, "", "install", "--yes", "--harness", "claude", "--app", "desktop", "--no-copy", "--skip-check",
+		"--components", "boards", "--set", "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/org")
+	if code != 0 {
+		t.Fatalf("code=%d\n%s", code, out)
+	}
+	title := "Como gerar o PAT"
+	if strings.Count(out, title) != 1 || !strings.Contains(out, "arquivo encontrado") {
+		t.Errorf("guia do PAT deveria aparecer uma vez mesmo com o arquivo existente:\n%s", out)
+	}
+	if !strings.Contains(out, "https://dev.azure.com/org/_usersSettings/tokens") {
+		t.Errorf("guia deveria usar a URL já respondida:\n%s", out)
+	}
+
+	// a path given by flag skips the upfront guide
+	code, out = runCLI(t, e, "", "install", "--yes", "--harness", "claude", "--app", "desktop", "--no-copy", "--skip-check",
+		"--components", "boards", "--set", "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/org",
+		"--set", "AZURE_DEVOPS_PAT_FILE="+filepath.Join(e.Home, ".devpulse", "azdo-pat"))
+	if code != 0 || strings.Contains(out, title) {
+		t.Errorf("com --set e o arquivo existente o guia não deveria aparecer (%d):\n%s", code, out)
+	}
 }
 
 func TestInstallDryRunWritesNothing(t *testing.T) {

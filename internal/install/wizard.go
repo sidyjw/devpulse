@@ -588,10 +588,15 @@ func (w *wizard) askSecret(s provider.Setting, prefill, env map[string]string) e
 	}
 
 	var path string
+	guided := false // the guide was already shown before the question
 	if v, ok := w.o.set[s.Env]; ok {
 		path = v
 		w.p.answered(s.Label, v)
 	} else {
+		if s.Guide != nil && s.Guide.Show == provider.GuideAlways && !moveInline {
+			w.guide(s.Guide, prefill, env)
+			guided = true
+		}
 		var err error
 		if path, err = w.p.Input(label(s), w.defaultFor(s, prefill), required); err != nil {
 			return err
@@ -609,7 +614,7 @@ func (w *wizard) askSecret(s provider.Setting, prefill, env map[string]string) e
 	} else if exists(path) {
 		w.status("  ! %s existe, mas não é utilizável: %v", path, err)
 	}
-	if !moveInline {
+	if !moveInline && !guided {
 		w.guide(s.Guide, prefill, env)
 	}
 	if w.o.dryRun {
@@ -690,14 +695,24 @@ func copyExecutable(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	if exists(dst) {
-		old := dst + ".old"
-		_ = os.Remove(old)
-		if err := os.Rename(dst, old); err != nil {
-			return fmt.Errorf("não consegui substituir %s (feche os apps que usam o servidor): %w", dst, err)
-		}
+	if err := moveAside(dst); err != nil {
+		return err
 	}
 	return atomicWrite(dst, data, 0o755)
+}
+
+// moveAside renames an existing dst to dst.old, so a new file can take its
+// place even while it is running.
+func moveAside(dst string) error {
+	if !exists(dst) {
+		return nil
+	}
+	old := dst + ".old"
+	_ = os.Remove(old)
+	if err := os.Rename(dst, old); err != nil {
+		return fmt.Errorf("não consegui substituir %s (feche os apps que usam o servidor): %w", dst, err)
+	}
+	return nil
 }
 
 // ---------- validation ----------
@@ -782,6 +797,10 @@ func (w *wizard) install() error {
 	if err != nil {
 		return err
 	}
+	addPath, err := w.choosePath(command)
+	if err != nil {
+		return err
+	}
 	spec := Spec{Name: w.o.name, Command: command, Env: env}
 
 	// ----- summary -----
@@ -789,6 +808,9 @@ func (w *wizard) install() error {
 	w.printf("%s", w.c.Field("Executável", w.c.Cyan(command)))
 	if copyBin {
 		w.printf("  %s", w.c.Dim("(copiado de "+w.e.Exe+")"))
+	}
+	if addPath != nil {
+		w.printf("\n%s", w.c.Field("PATH", addPath.describe()))
 	}
 	var cn []string
 	for _, c := range comps {
@@ -857,6 +879,12 @@ func (w *wizard) install() error {
 		}
 		w.status("✓ executável copiado para %s", command)
 	}
+	if addPath != nil {
+		if err := w.applyPath(addPath); err != nil {
+			w.status("! não consegui adicionar %s ao PATH: %v", addPath.dir, err)
+			addPath = nil
+		}
+	}
 	if !w.o.skipCheck {
 		w.note("Validando a configuração (%s -check)...", filepath.Base(command))
 		if err := w.runCheck(command, env); err != nil {
@@ -922,6 +950,9 @@ func (w *wizard) install() error {
 	w.section("Próximos passos")
 	for _, a := range sel.apps {
 		w.printf("%s %s %s\n", w.c.Cyan("•"), w.c.Bold(a.Name()+":"), a.NextSteps())
+	}
+	if addPath != nil {
+		w.printf("%s %s Abra um terminal novo para usar `%s` (ex.: `%s update`).\n", w.c.Cyan("•"), w.c.Bold("Terminal:"), w.b.Name, w.b.Name)
 	}
 	if len(failed) > 0 {
 		return fmt.Errorf("não foi possível configurar: %s", strings.Join(failed, ", "))

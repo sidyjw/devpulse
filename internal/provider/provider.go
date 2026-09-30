@@ -47,10 +47,23 @@ type Setting struct {
 	// SecretAlt is the env var that holds the secret inline, for SecretFile
 	// settings (e.g. "SEVENPACE_TOKEN" for "SEVENPACE_TOKEN_FILE").
 	SecretAlt string
-	// Guide explains where to get the value (optional). For SecretFile
-	// settings it is shown only when the file still has to be created.
+	// Guide explains where to get the value (optional). Guide.Show says
+	// when the installer shows it.
 	Guide *Guide
 }
+
+// GuideShow says when the installer shows a Guide.
+type GuideShow int
+
+const (
+	// GuideWhenNeeded shows the guide before the question for ordinary
+	// settings; for SecretFile settings, only after the path is answered and
+	// only if the file still has to be created.
+	GuideWhenNeeded GuideShow = iota
+	// GuideAlways shows the guide before the question, even when a
+	// SecretFile already exists.
+	GuideAlways
+)
 
 // Guide is a step-by-step explanation shown by the installer. Steps may
 // reference other settings as {ENV} or {ENV|fallback}; the installer fills
@@ -58,6 +71,7 @@ type Setting struct {
 type Guide struct {
 	Title string
 	Steps []string
+	Show  GuideShow
 }
 
 // Instance is a component built from a configuration.

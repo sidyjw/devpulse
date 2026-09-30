@@ -8,6 +8,7 @@
 //	devpulse install         guided installation into an AI harness
 //	devpulse uninstall       remove it from a harness
 //	devpulse detect          show the OS, harnesses and existing installations
+//	devpulse update          download and install the latest release
 package main
 
 import (
@@ -52,6 +53,7 @@ Regras:
 - Nunca peça ao usuário tokens ou PATs no chat: eles são configurados fora da conversa.`
 
 func main() {
+	httpx.UserAgent = name + "/" + version
 	if len(os.Args) > 1 && install.IsCommand(os.Args[1]) {
 		os.Exit(install.Run(os.Args[1:], install.Build{Name: name, Version: version, Providers: providers.All()}, os.Stdin, os.Stdout, os.Stderr))
 	}
@@ -59,7 +61,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "mostra a versão e sai")
 	check := flag.Bool("check", false, "valida a configuração, testa as conexões e sai")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "uso: %s [-check | -version]\n       %s install | uninstall | detect [flags]   (use -h em cada um)\n", name, name)
+		fmt.Fprintf(flag.CommandLine.Output(), "uso: %s [-check | -version]\n       %s install | uninstall | detect | update [flags]   (use -h em cada um)\n", name, name)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -69,7 +71,6 @@ func main() {
 		return
 	}
 
-	httpx.UserAgent = name + "/" + version
 	timeout, err := settings.HTTPTimeout(os.Getenv)
 	if err != nil {
 		mcp.Logf("configuração inválida: %v", err)
