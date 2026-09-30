@@ -30,6 +30,10 @@ const (
 	SecretFile             // path to a file holding a token (NAME_FILE)
 	Bool                   // "true" / "false"; written only when true
 	Duration               // e.g. "30s"
+	// Flag is set to "true" without asking whenever the component is
+	// chosen. It turns on a component whose other settings are shared with
+	// another one (e.g. Repos uses the Boards organization and PAT).
+	Flag
 )
 
 // Setting is one environment variable a component reads.

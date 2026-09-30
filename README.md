@@ -7,7 +7,10 @@ O servidor é organizado em **providers** (a ferramenta de gestão) e **componen
 | Provider | Componente | O que faz |
 |---|---|---|
 | Azure DevOps | **Boards** | Sprints, quadro, épicos, features, user stories, tasks e bugs |
+| Azure DevOps | **Repos** | Repositórios, branches, políticas de branch e pull requests |
 | Azure DevOps | **7pace Timetracker** | Lançar, corrigir e resumir horas |
+
+O DevPulse oferece as ferramentas e não impõe um fluxo de trabalho: convenções de branch, quando abrir uma PR ou quanto tempo lançar ficam com você e com a sua harness.
 
 Outras ferramentas (Jira, GitLab…) entram como um novo provider. Veja [Adicionando um provider](#adicionando-um-provider).
 
@@ -43,7 +46,7 @@ Nasceu como `7pace-mcp`, uma reescrita em Go do [turnono/7pace-mcp-server](https
 | Lançamento duplicado | lança de novo | **recusado** (mesmo dia, item, duração e comentário) |
 | Lote de lançamentos | não tem | valida **tudo** antes de enviar o primeiro |
 | Exclusão | sempre disponível | desligada por padrão (`SEVENPACE_ENABLE_DELETE`) |
-| Somente leitura | não tem | `SEVENPACE_READ_ONLY` / `AZURE_DEVOPS_READ_ONLY` |
+| Somente leitura | não tem | `SEVENPACE_READ_ONLY` / `AZURE_DEVOPS_READ_ONLY` / `AZURE_DEVOPS_REPOS_READ_ONLY` |
 | Edição concorrente no Boards | não tem | usa a revisão do item (`test /rev`): não sobrescreve alteração de outra pessoa |
 | Instalação | editar JSON à mão | `devpulse install`: faz backup, preserva o resto do arquivo e o token vai da área de transferência direto para um arquivo protegido |
 
@@ -84,6 +87,32 @@ Bugs de API corrigidos, conforme a [documentação oficial da 7pace](https://git
 | `add_work_item_comment` | Comenta num item |
 
 Excluir work items não é suportado de propósito. Para isso, use `state: "Removed"`.
+
+**Azure DevOps / Repos**
+
+O Repos cobre o lado do servidor. Commits e push continuam com o `git` da sua máquina. Nas tools, `repository` aceita o nome, o ID ou a URL do remoto (`git remote get-url origin`); um remoto de outra organização é recusado antes de qualquer requisição.
+
+| Tool | O que faz |
+|---|---|
+| `list_repositories`, `get_repository` | Repositórios do projeto, com a branch padrão e as URLs de clone |
+| `list_branches` | Branches remotas, com o commit de cada uma |
+| `get_branch_policies` | Políticas de uma branch (revisores, build, work item…) e se ela só aceita mudanças por PR |
+| `list_pull_requests` | PRs por status, autor, revisor e branches |
+| `get_pull_request` | Detalhes: revisores e votos, work items, checks das políticas e threads de comentários |
+| `create_branch` | Cria uma branch remota a partir de outra branch ou de um commit, opcionalmente vinculada a um work item |
+| `create_pull_request` | Abre uma PR (ou um rascunho), com revisores, work items e tags |
+| `update_pull_request` | Título, descrição, rascunho/publicada, branch de destino, novos revisores e work items |
+| `add_pull_request_comment` | Comenta na PR, numa linha de arquivo ou responde a uma thread |
+
+Excluir branches e completar ou abandonar PRs não são suportados. As regras de cada branch (por exemplo, exigir PR na `main`) ficam nas políticas do Azure DevOps.
+
+**Geral**
+
+| Tool | O que faz |
+|---|---|
+| `session_time` | Tempo desde o início da sessão (ou desde um horário informado) e as outras sessões do DevPulse que rodaram no mesmo período, com a sobreposição. É uma **sugestão** para lançar horas: nada é lançado. |
+
+Cada processo do DevPulse registra o próprio início num arquivo em `~/.devpulse/sessions/` e o atualiza a cada minuto. É assim que uma sessão enxerga as outras. No Claude Code, cada sessão tem o seu processo. Clientes que mantêm o servidor aberto entre conversas, como o Claude Desktop, devem informar `since`.
 
 ---
 
@@ -222,9 +251,12 @@ devpulse install --yes --harness claude --app code,desktop --scope user \
 
 **7pace**: no Azure DevOps, abra o **7pace Timetracker** e vá em **Settings → API & Reporting** para criar um token. A organização é o prefixo da URL. Por exemplo, em `https://minhaorg.timehub.7pace.com`, ela é `minhaorg`.
 
-**Azure DevOps (Boards)**: em `https://dev.azure.com/<org>`, abra o ícone de usuário e depois **Personal access tokens → New Token**. Em **Scopes → Custom defined**, marque:
+**Azure DevOps (Boards e Repos)**: em `https://dev.azure.com/<org>`, abra o ícone de usuário e depois **Personal access tokens → New Token**. Em **Scopes → Custom defined**, marque:
 - **Work Items: Read & write**. Se quiser só consultar, basta **Read**.
 - **Project and Team: Read**
+- **Code: Read & write**, só se for usar o Repos. Para só consultar, basta **Read**.
+
+O Boards e o Repos usam o mesmo PAT.
 
 Escolha uma validade curta, como 90 dias.
 
@@ -298,6 +330,15 @@ Um componente é ativado quando suas variáveis obrigatórias estão definidas. 
 | `AZURE_DEVOPS_TEAM` | não | Time padrão (se não definido, usa o time padrão do projeto) |
 | `AZURE_DEVOPS_READ_ONLY` | não | `true` esconde as tools que criam ou alteram work items |
 
+**Azure DevOps / Repos**
+
+O Repos usa a conexão do Boards (`AZURE_DEVOPS_ORG_URL`, o PAT e o projeto padrão), então ligar o Repos liga também o Boards.
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `AZURE_DEVOPS_REPOS` | sim | `true` liga o Repos (o instalador grava ao escolher o componente) |
+| `AZURE_DEVOPS_REPOS_READ_ONLY` | não | `true` esconde as tools que criam branches e alteram pull requests |
+
 **Azure DevOps / 7pace Timetracker**
 
 | Variável | Obrigatória | Descrição |
@@ -334,6 +375,10 @@ Um componente é ativado quando suas variáveis obrigatórias estão definidas. 
 - "Cria uma US 'Exportar pedidos em CSV' no épico 3900, na sprint atual, com 5 pontos, e quebra em 3 tasks de 4h."
 - "Move a 4312 para Done e zera o remaining."
 - "Lista os épicos ativos e as features de cada um."
+- "Abre uma PR da minha branch atual para a develop, vinculada à 4312, com a Ana como revisora."
+- "A main exige PR? Quantos revisores?"
+- "O que falta resolver nos comentários da PR 57?"
+- "Quanto tempo passei nesta sessão? Sugere o lançamento na 4312."
 
 Antes de qualquer escrita, o assistente mostra o que vai fazer. O Claude Desktop também pede sua permissão a cada chamada de tool que grava.
 
@@ -347,7 +392,8 @@ internal/httpx/                  # cliente HTTPS: sem redirect, limite de respos
 internal/settings/               # leitura/validação de variáveis e arquivos de segredo
 internal/provider/               # contratos Provider / Component / Setting e a ativação
 internal/providers/registry.go   # lista de providers desta versão
-internal/providers/azuredevops/  # provider Azure DevOps: componentes Boards e 7pace
+internal/providers/azuredevops/  # provider Azure DevOps: componentes Boards, Repos e 7pace
+internal/session/                # tempo da sessão e sessões paralelas (session_time)
 internal/install/                # instalador: harnesses, apps, edição de config, prompts, PATH e update
 internal/release/                # releases do GitHub: consulta, download, SHA256 e extração (devpulse update)
 .github/workflows/release.yml    # build e publicação das releases a cada tag vX.Y.Z
@@ -356,9 +402,11 @@ internal/release/                # releases do GitHub: consulta, download, SHA25
 ## Adicionando um provider
 
 1. Crie `internal/providers/<nome>/` com uma função que devolva um `provider.Provider`, com um `provider.Component` para cada módulo. Cada componente declara:
-   - `Settings`: as variáveis que ele lê, com rótulo, ajuda, tipo (`String`, `URL`, `SecretFile`, `Bool`, `Duration`), se é obrigatória ou avançada, o valor padrão e a **mesma** função de validação usada pelo servidor. O instalador monta as perguntas a partir disso. Opcionalmente, `Guide` traz um passo a passo de onde obter o valor, e os passos podem citar respostas anteriores como `{VARIAVEL|alternativa}`. `Guide.Show` diz quando o guia aparece:
+   - `Settings`: as variáveis que ele lê, com rótulo, ajuda, tipo (`String`, `URL`, `SecretFile`, `Bool`, `Duration`, `Flag`), se é obrigatória ou avançada, o valor padrão e a **mesma** função de validação usada pelo servidor. O instalador monta as perguntas a partir disso. Opcionalmente, `Guide` traz um passo a passo de onde obter o valor, e os passos podem citar respostas anteriores como `{VARIAVEL|alternativa}`. `Guide.Show` diz quando o guia aparece:
      - `provider.GuideWhenNeeded` (padrão): nos campos comuns, antes da pergunta. Nos tokens, só depois de a pessoa informar o caminho e só se o arquivo ainda precisa ser criado.
      - `provider.GuideAlways`: sempre antes da pergunta, mesmo que o arquivo já exista. É o que usam o PAT do Azure DevOps e o token do 7pace.
+
+     Componentes do mesmo provider podem declarar as mesmas variáveis (como o Boards e o Repos fazem com a conexão): o instalador pergunta cada uma só uma vez. Uma variável `Flag` é gravada como `true` sem pergunta quando o componente é escolhido. Ela serve para ligar um componente cujas outras variáveis são compartilhadas.
    - `Enabled`: quando o ambiente liga o componente.
    - `Build`: cria a instância. `bc.Get("<provider>.<componente>")` dá acesso a componentes construídos antes.
    - `Instructions`: regras que entram nas instructions do servidor MCP.
@@ -375,7 +423,8 @@ go test -race ./...
 ```
 
 Os testes não acessam a rede:
-- **Servidor e providers**: usam servidores 7pace e Azure DevOps falsos (`httptest`). Verificam payloads, parâmetros da API, PATCH, bloqueio de duplicidade, validação de lote, bloqueio de redirect, remoção do token de mensagens de erro, limite de tamanho de resposta, escape de WIQL, configuração e ativação dos componentes.
+- **Servidor e providers**: usam servidores 7pace e Azure DevOps falsos (`httptest`). Verificam payloads, parâmetros da API, PATCH, bloqueio de duplicidade, validação de lote, bloqueio de redirect, remoção do token de mensagens de erro, limite de tamanho de resposta, escape de WIQL, configuração e ativação dos componentes. No Repos: leitura da URL do remoto (e recusa de outras organizações), validação de nomes de branch, criação de branch e de PR, vínculo com work items e mensagens de erro do Azure DevOps.
+- **Sessões**: relógio simulado e diretório temporário. Cobrem a sobreposição com sessões ativas, encerradas e interrompidas (sem contar a mesma hora duas vezes), o `since` e a limpeza dos registros antigos.
 - **Instalador**: roda em diretórios temporários com comandos externos simulados. Cobre a edição de JSON (preserva chaves e ordem, faz backup, é idempotente, recusa JSON com comentários), os caminhos por sistema (incluindo o Claude Desktop MSIX), o uso seguro do CLI `claude`, os fluxos interativo e não interativo, o dry-run, a migração da entrada `7pace`, a gravação do token, a ordem dos guias, o PATH (sem duplicar a linha e sem mexer no sistema real) e o `update`: troca do executável, `.old`, recusa quando o novo não roda, `--check` e `--dry-run`.
 - **Releases**: usam uma API do GitHub falsa (`httptest` com TLS). Cobrem o download conferido pelo SHA256, a recusa de hash errado, o bloqueio de http e de redirecionamento para outros hosts, a extração de zip e tar.gz e a comparação de versões.
 

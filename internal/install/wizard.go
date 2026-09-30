@@ -398,10 +398,14 @@ func (w *wizard) collectSettings(comps []provider.Component, prefill map[string]
 		}
 	}
 
+	// components of a provider may share settings (e.g. the organization):
+	// each variable is asked once, in the first component that declares it
+	asked := map[string]bool{}
 	var advanced []provider.Setting
 	for _, c := range comps {
 		for _, s := range c.Settings {
-			if s.Advanced {
+			if s.Advanced && !asked[s.Env] {
+				asked[s.Env] = true
 				advanced = append(advanced, s)
 			}
 		}
@@ -409,12 +413,26 @@ func (w *wizard) collectSettings(comps []provider.Component, prefill map[string]
 	advanced = append(advanced, provider.GlobalSettings...)
 
 	for _, c := range comps {
-		w.section(c.Name)
+		var own []provider.Setting
 		for _, s := range c.Settings {
-			if !s.Advanced {
-				if err := w.askSetting(s, prefill, env); err != nil {
-					return nil, err
-				}
+			if !s.Advanced && !asked[s.Env] {
+				asked[s.Env] = true
+				own = append(own, s)
+			}
+		}
+		if len(own) == 0 {
+			continue
+		}
+		asks := false
+		for _, s := range own {
+			asks = asks || s.Kind != provider.Flag
+		}
+		if asks {
+			w.section(c.Name)
+		}
+		for _, s := range own {
+			if err := w.askSetting(s, prefill, env); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -462,6 +480,10 @@ func (w *wizard) defaultFor(s provider.Setting, prefill map[string]string) strin
 }
 
 func (w *wizard) askSetting(s provider.Setting, prefill, env map[string]string) error {
+	if s.Kind == provider.Flag {
+		env[s.Env] = "true" // the component was chosen: nothing to ask
+		return nil
+	}
 	if s.Kind == provider.SecretFile {
 		return w.askSecret(s, prefill, env)
 	}

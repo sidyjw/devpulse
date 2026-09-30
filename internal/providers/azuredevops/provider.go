@@ -21,17 +21,18 @@ import (
 const (
 	ProviderID  = "azuredevops"
 	BoardsID    = "boards"
+	ReposID     = "repos"
 	SevenPaceID = "sevenpace"
 	boardsKey   = ProviderID + "." + BoardsID
 )
 
-// Provider returns the Azure DevOps provider. Boards comes first so the
-// 7pace component can use it to show work item titles.
+// Provider returns the Azure DevOps provider. Boards comes first: Repos
+// shares its connection and 7pace uses it to show work item titles.
 func Provider() provider.Provider {
 	return provider.Provider{
 		ID:         ProviderID,
 		Name:       "Azure DevOps",
-		Components: []provider.Component{boardsComponent(), sevenPaceComponent()},
+		Components: []provider.Component{boardsComponent(), reposComponent(), sevenPaceComponent()},
 	}
 }
 
@@ -87,31 +88,39 @@ func loadBoardsConfig(getenv func(string) string) (*boardsConfig, error) {
 	}, nil
 }
 
+// connectionSettings are shared by Boards and Repos: the installer asks them
+// once, whichever of the two is chosen.
+func connectionSettings() []provider.Setting {
+	return []provider.Setting{
+		{Env: "AZURE_DEVOPS_ORG_URL", Label: "URL da organização", Help: "ex.: https://dev.azure.com/minhaorg",
+			Kind: provider.URL, Required: true, Validate: settings.CheckHTTPSURL},
+		{Env: "AZURE_DEVOPS_PAT_FILE", Label: "Arquivo com o PAT", Help: "escopos: Work Items (Read & write), Project and Team (Read) e, para o Repos, Code (Read & write)",
+			Kind: provider.SecretFile, Required: true, SecretAlt: "AZURE_DEVOPS_PAT", Default: secretDefault("azdo-pat", "azdo-pat"),
+			Guide: &provider.Guide{
+				Title: "Como gerar o PAT (Personal Access Token) do Azure DevOps",
+				Show:  provider.GuideAlways,
+				Steps: []string{
+					"Abra {AZURE_DEVOPS_ORG_URL|https://dev.azure.com/<sua-org>}/_usersSettings/tokens (ou, no Azure DevOps: ícone de usuário no canto superior direito → Personal access tokens).",
+					"Clique em New Token, dê um nome (ex.: devpulse) e escolha a organização e a validade.",
+					"Em Scopes, escolha Custom defined e marque: Work Items → Read & write; Project and Team → Read (use Show all scopes se algum não aparecer). Para uso somente leitura, Work Items → Read basta.",
+					"Se for usar o Repos (branches e pull requests), marque também Code → Read & write (ou Code → Read, para só consultar).",
+					"Clique em Create e copie o token: ele só é mostrado uma vez.",
+				},
+			}},
+		{Env: "AZURE_DEVOPS_PROJECT", Label: "Projeto padrão", Help: "opcional; evita repetir o projeto em toda pergunta"},
+	}
+}
+
 func boardsComponent() provider.Component {
 	return provider.Component{
 		ID:          BoardsID,
 		Name:        "Boards",
 		Description: "Sprints, quadro, épicos, features, user stories, tasks e bugs",
-		Settings: []provider.Setting{
-			{Env: "AZURE_DEVOPS_ORG_URL", Label: "URL da organização", Help: "ex.: https://dev.azure.com/minhaorg",
-				Kind: provider.URL, Required: true, Validate: settings.CheckHTTPSURL},
-			{Env: "AZURE_DEVOPS_PAT_FILE", Label: "Arquivo com o PAT", Help: "escopos: Work Items (Read & write) e Project and Team (Read)",
-				Kind: provider.SecretFile, Required: true, SecretAlt: "AZURE_DEVOPS_PAT", Default: secretDefault("azdo-pat", "azdo-pat"),
-				Guide: &provider.Guide{
-					Title: "Como gerar o PAT (Personal Access Token) do Azure DevOps",
-					Show:  provider.GuideAlways,
-					Steps: []string{
-						"Abra {AZURE_DEVOPS_ORG_URL|https://dev.azure.com/<sua-org>}/_usersSettings/tokens (ou, no Azure DevOps: ícone de usuário no canto superior direito → Personal access tokens).",
-						"Clique em New Token, dê um nome (ex.: devpulse) e escolha a organização e a validade.",
-						"Em Scopes, escolha Custom defined e marque: Work Items → Read & write; Project and Team → Read (use Show all scopes se algum não aparecer). Para uso somente leitura, Work Items → Read basta.",
-						"Clique em Create e copie o token: ele só é mostrado uma vez.",
-					},
-				}},
-			{Env: "AZURE_DEVOPS_PROJECT", Label: "Projeto padrão", Help: "opcional; evita repetir o projeto em toda pergunta"},
-			{Env: "AZURE_DEVOPS_TEAM", Label: "Time padrão", Help: "opcional; se vazio, usa o time padrão do projeto", Advanced: true},
-			{Env: "AZURE_DEVOPS_READ_ONLY", Label: "Somente leitura?", Help: "esconde as tools que criam ou alteram work items",
+		Settings: append(connectionSettings(),
+			provider.Setting{Env: "AZURE_DEVOPS_TEAM", Label: "Time padrão", Help: "opcional; se vazio, usa o time padrão do projeto", Advanced: true},
+			provider.Setting{Env: "AZURE_DEVOPS_READ_ONLY", Label: "Somente leitura?", Help: "esconde as tools que criam ou alteram work items",
 				Kind: provider.Bool, Advanced: true, Validate: settings.CheckBool},
-		},
+		),
 		Instructions: "- Para achar o work item certo, use query_work_items (ex.: assignedTo=\"me\", sprint=\"current\").",
 		Enabled: func(getenv func(string) string) bool {
 			return strings.TrimSpace(getenv("AZURE_DEVOPS_ORG_URL")) != ""
@@ -162,6 +171,64 @@ func (b *boardsInstance) Check(ctx context.Context, w io.Writer) error {
 		}
 	}
 	return failed
+}
+
+// ---------- Repos ----------
+
+type reposConfig struct {
+	ReadOnly bool
+}
+
+func reposComponent() provider.Component {
+	return provider.Component{
+		ID:          ReposID,
+		Name:        "Repos",
+		Description: "Repositórios, branches, políticas e pull requests (usa a conexão do Boards)",
+		Settings: append(connectionSettings(),
+			provider.Setting{Env: "AZURE_DEVOPS_REPOS", Label: "Repos", Kind: provider.Flag, Required: true, Validate: settings.CheckBool},
+			provider.Setting{Env: "AZURE_DEVOPS_REPOS_READ_ONLY", Label: "Repos somente leitura?", Help: "esconde as tools que criam branches e alteram pull requests",
+				Kind: provider.Bool, Advanced: true, Validate: settings.CheckBool},
+		),
+		Instructions: "- Nas tools do Repos, repository aceita nome, ID ou a URL do remoto (`git remote get-url origin`).\n" +
+			"- O Repos cobre o lado do servidor (branches remotas, pull requests, políticas); commits e push continuam com o git local.",
+		Enabled: func(getenv func(string) string) bool {
+			return settings.EnvBool(getenv("AZURE_DEVOPS_REPOS"))
+		},
+		Build: func(bc *provider.BuildContext) (provider.Instance, error) {
+			b, ok := bc.Get(boardsKey).(*boardsInstance)
+			if !ok {
+				return nil, errors.New("AZURE_DEVOPS_REPOS=true exige AZURE_DEVOPS_ORG_URL e o PAT (a mesma conexão do Boards)")
+			}
+			cfg := &reposConfig{ReadOnly: settings.EnvBool(bc.Getenv("AZURE_DEVOPS_REPOS_READ_ONLY"))}
+			return &reposInstance{cfg: cfg, boards: b.cfg, az: b.az}, nil
+		},
+	}
+}
+
+type reposInstance struct {
+	cfg    *reposConfig
+	boards *boardsConfig
+	az     *AzDO
+}
+
+func (r *reposInstance) Register(s *mcp.Server) { registerReposTools(s, r.az, r.cfg) }
+
+func (r *reposInstance) Check(ctx context.Context, w io.Writer) error {
+	c := ui.For(w)
+	line := func(format string, args ...any) { fmt.Fprintln(w, c.Mark(fmt.Sprintf(format, args...))) }
+	fmt.Fprintln(w, c.BoldCyan("Azure Repos:"), r.boards.OrgURL)
+	defer func() { fmt.Fprintln(w, c.Dim(fmt.Sprintf("  somente leitura: %v", r.cfg.ReadOnly))) }()
+	if r.boards.Project == "" {
+		line("  ✓ sem projeto padrão: informe project (ou a URL do remoto) nas tools")
+		return nil
+	}
+	repos, project, err := r.az.Repositories(ctx, "")
+	if err != nil {
+		line("  ✗ listar repositórios: %v (o PAT precisa do escopo Code)", err)
+		return err
+	}
+	line("  ✓ %d repositórios no projeto %q", len(repos), project)
+	return nil
 }
 
 // ---------- 7pace Timetracker ----------
