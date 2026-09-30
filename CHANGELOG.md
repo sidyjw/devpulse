@@ -6,6 +6,20 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+### Adicionado
+
+- Instalação em uma linha: `install.sh` (macOS/Linux) e `install.ps1` (Windows). Eles baixam a release do sistema, conferem o SHA256 e rodam o `devpulse install`. Também são publicados em cada release.
+- `devpulse update`:
+  - baixa a versão mais recente, ou a pedida com `--version`, e confere o SHA256;
+  - testa o novo executável antes de trocar o de cada app e deixa o anterior como `.old`;
+  - `--check` só informa se há versão nova.
+- O instalador oferece adicionar a pasta do executável ao `PATH`: no Windows, no PATH do usuário; nos shells zsh, bash e fish, no arquivo de perfil. `--no-path` pula esse passo.
+- `Guide.Show` nos providers: o passo a passo de um campo pode aparecer sempre antes da pergunta (`GuideAlways`).
+
+### Alterado
+
+- O passo a passo para gerar o PAT do Azure DevOps e o token do 7pace agora aparece antes da pergunta do arquivo, mesmo quando o arquivo já existe. Antes, só aparecia depois do Enter e se o arquivo não existisse.
+
 ## [0.1.0] - 2026-09-29
 
 Primeira release pública.

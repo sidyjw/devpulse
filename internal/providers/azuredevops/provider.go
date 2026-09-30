@@ -99,6 +99,7 @@ func boardsComponent() provider.Component {
 				Kind: provider.SecretFile, Required: true, SecretAlt: "AZURE_DEVOPS_PAT", Default: secretDefault("azdo-pat", "azdo-pat"),
 				Guide: &provider.Guide{
 					Title: "Como gerar o PAT (Personal Access Token) do Azure DevOps",
+					Show:  provider.GuideAlways,
 					Steps: []string{
 						"Abra {AZURE_DEVOPS_ORG_URL|https://dev.azure.com/<sua-org>}/_usersSettings/tokens (ou, no Azure DevOps: ícone de usuário no canto superior direito → Personal access tokens).",
 						"Clique em New Token, dê um nome (ex.: devpulse) e escolha a organização e a validade.",
@@ -223,6 +224,7 @@ func sevenPaceComponent() provider.Component {
 				Kind: provider.SecretFile, Required: true, SecretAlt: "SEVENPACE_TOKEN", Default: secretDefault("7pace-token", "token"),
 				Guide: &provider.Guide{
 					Title: "Como gerar o token da API do 7pace Timetracker",
+					Show:  provider.GuideAlways,
 					Steps: []string{
 						"Abra o 7pace em https://{SEVENPACE_ORGANIZATION|<org>}.timehub.7pace.com (ou pela aba Timetracker dentro do Azure DevOps).",
 						"Vá em Settings (ícone de engrenagem) → API & Reporting.",

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/sidyjw/devpulse/internal/release"
 )
 
 // Cmd is an external command run by the installer.
@@ -38,6 +40,8 @@ type Env struct {
 	LookPath func(string) (string, error)
 	// Run executes a command and returns its stdout.
 	Run func(ctx context.Context, c Cmd) (string, error)
+	// Releases finds and downloads the published versions (update).
+	Releases *release.Client
 }
 
 // RealEnv inspects the running system.
@@ -58,6 +62,7 @@ func RealEnv() *Env {
 		Environ:      os.Environ,
 		LookPath:     exec.LookPath,
 		Run:          runCmd,
+		Releases:     release.New(),
 	}
 	if e.XDGConfig == "" && home != "" {
 		e.XDGConfig = filepath.Join(home, ".config")

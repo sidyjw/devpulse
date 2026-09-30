@@ -36,6 +36,9 @@ jobs:
         run: |
           go vet ./...
           go test ./...
+          sh -n install.sh
+          shellcheck install.sh
+          pwsh -NoProfile -Command '$e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path install.ps1), [ref]$null, [ref]$e); if ($e) { $e; exit 1 }'
 
       - name: Compilar
         env:
@@ -58,6 +61,7 @@ jobs:
               tar -C build -czf "dist/$pkg.tar.gz" "$pkg"
             fi
           done
+          cp install.sh install.ps1 dist/   # também na release, com checksum e atestado
           (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
 
       - name: Atestar proveniência

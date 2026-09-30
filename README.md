@@ -11,6 +11,22 @@ O servidor é organizado em **providers** (a ferramenta de gestão) e **componen
 
 Outras ferramentas (Jira, GitLab…) entram como um novo provider. Veja [Adicionando um provider](#adicionando-um-provider).
 
+## Início rápido
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sidyjw/devpulse/main/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/sidyjw/devpulse/main/install.ps1 | iex
+```
+
+O script baixa a última release do seu sistema, confere o SHA256 com o `SHA256SUMS.txt` publicado e abre o [assistente de instalação](#2-rode-o-instalador). Depois, `devpulse update` mantém tudo atualizado. Veja também as [outras formas de instalar](#1-baixe-ou-compile).
+
 Nasceu como `7pace-mcp`, uma reescrita em Go do [turnono/7pace-mcp-server](https://github.com/turnono/7pace-mcp-server) com foco em segurança e correção, e depois se chamou `pm-mcp`. Quem vem de uma dessas versões deve ler a [migração](#migrando-do-pm-mcp-ou-do-7pace-mcp).
 
 ## Por que esta versão é mais segura
@@ -75,6 +91,24 @@ Excluir work items não é suportado de propósito. Para isso, use `state: "Remo
 
 ### 1. Baixe ou compile
 
+**Com o script (recomendado):** é o [Início rápido](#início-rápido). Os scripts fazem o mesmo que os passos manuais abaixo:
+
+- Escolhem o arquivo do seu sistema e da sua arquitetura.
+- Conferem o SHA256 e rodam o `devpulse install`.
+- Recusam o download se o hash não bater.
+
+Para passar flags ao instalador:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sidyjw/devpulse/main/install.sh | sh -s -- --yes --harness claude --app code
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/sidyjw/devpulse/main/install.ps1))) --yes --harness claude --app code
+```
+
+Para fixar uma versão, defina `DEVPULSE_VERSION=0.2.0` (no PowerShell, `$env:DEVPULSE_VERSION = '0.2.0'`). Se preferir ler o script antes de rodar, baixe o `install.sh` ou o `install.ps1` da release: eles também estão no `SHA256SUMS.txt` e no atestado de proveniência.
+
 **Binário pronto:** na página de [Releases](https://github.com/sidyjw/devpulse/releases), baixe o arquivo do seu sistema (`windows`, `darwin` = macOS ou `linux`; `amd64` = Intel/AMD, `arm64` = ARM/Apple Silicon) e extraia. Para conferir o download:
 
 ```bash
@@ -113,8 +147,13 @@ O assistente faz isto:
 3. Mostra o **arquivo de configuração padrão** de cada app. Tecle Enter para aceitar ou digite outro caminho se o seu ambiente é customizado.
 4. Pergunta a **ferramenta de gestão** e os **componentes** que você quer integrar.
 5. Pergunta só as configurações desses componentes, cada uma com um valor padrão. As opções avançadas (somente leitura, exclusão, time padrão, tempo limite…) ficam atrás de uma pergunta.
-6. Para cada token: se o arquivo não existe, mostra o passo a passo para gerá-lo (com o link da sua organização) e oferece criá-lo. **Copie o token (Ctrl+C) e tecle Enter.** O instalador lê a área de transferência, grava um arquivo que só você pode ler (`chmod 600` ou `icacls`) e limpa a área de transferência. O token nunca aparece na tela nem no histórico do terminal.
-7. Copia o executável para um lugar fixo: `%LOCALAPPDATA%\Programs\devpulse\` no Windows ou `~/.local/bin/` no macOS/Linux. Esse lugar também pode ser alterado.
+6. Para cada token, mostra **antes da pergunta** o passo a passo para gerá-lo, com o link da sua organização. Isso vale para o PAT do Azure DevOps e para o token do 7pace. Se o arquivo ainda não existe, o instalador oferece criá-lo: **copie o token (Ctrl+C) e tecle Enter.** O instalador lê a área de transferência, grava um arquivo que só você pode ler (`chmod 600` ou `icacls`) e limpa a área de transferência. O token nunca aparece na tela nem no histórico do terminal.
+7. Copia o executável para um lugar fixo: `%LOCALAPPDATA%\Programs\devpulse\` no Windows ou `~/.local/bin/` no macOS/Linux. Esse lugar também pode ser alterado. Se a pasta não está no `PATH`, o instalador oferece adicioná-la:
+   - **Windows:** no PATH do usuário.
+   - **zsh e bash:** no `~/.zshrc` ou no `~/.bashrc` (`~/.bash_profile` no macOS).
+   - **fish:** em `conf.d`.
+
+   Assim, `devpulse update` funciona de qualquer pasta. `--no-path` pula esse passo.
 8. Mostra um **resumo**, roda o `-check` com a configuração nova e só então grava. Antes de alterar um arquivo existente, faz backup dele (`*.bak-AAAAMMDD-HHMMSS`) e mantém tudo o que não é do servidor.
 
 Nos menus e nas perguntas de sim/não, navegue com as **setas**: ↑/↓ movem, **Espaço** marca nas listas de múltipla escolha, ←/→ alternam entre Sim e Não, **Enter** confirma e **Ctrl+C** cancela sem alterar nada. A linha de ajuda aparece embaixo de cada pergunta. Fora de um terminal (por exemplo, com a entrada vinda de um pipe), o instalador aceita as respostas digitadas por número.
@@ -133,10 +172,26 @@ Onde cada app é configurado:
 ### Outros comandos
 
 ```bash
+devpulse update      # baixa a última versão, confere o SHA256 e troca o executável de cada app
 devpulse detect      # SO, apps detectados, arquivos de configuração e instalações existentes
 devpulse uninstall   # remove a entrada (com backup); não apaga o executável nem os tokens
 devpulse -check      # testa a configuração do ambiente atual
 ```
+
+O `devpulse update` faz isto:
+
+1. Procura os executáveis usados pelas entradas `devpulse` de todos os apps e escopos, e inclui o executável em execução.
+2. Mostra as novidades da versão e pede confirmação.
+3. Baixa a release do GitHub e confere o SHA256 com o `SHA256SUMS.txt`.
+4. Testa se o novo executável roda (`-version`).
+5. Só então troca cada arquivo. O anterior fica ao lado como `.old`, e a troca funciona mesmo com o Claude Desktop aberto no Windows. Depois, é só reiniciar os apps.
+
+| Flag do `update` | Para quê |
+|---|---|
+| `--check` | Só informa se há versão nova, sem baixar |
+| `--version 0.2.0` | Instala essa versão. Também serve para voltar a uma anterior |
+| `--dry-run` | Mostra quais executáveis seriam trocados |
+| `--yes` / `--force` | Não pergunta / reinstala mesmo que já esteja na versão pedida |
 
 ### Modo não interativo
 
@@ -157,6 +212,7 @@ devpulse install --yes --harness claude --app code,desktop --scope user \
 | `--dry-run` | Mostra tudo o que seria feito, sem gravar nada |
 | `--config <arquivo>` / `--key <a.b>` | Grava num arquivo e numa chave diferentes do padrão (ex.: `--harness generic --config ~/.cursor/mcp.json`) |
 | `--bin-dir <pasta>` / `--no-copy` | Muda o destino do executável, ou usa o executável de onde ele está |
+| `--no-path` | Não adiciona a pasta do executável ao `PATH` |
 | `--name <nome>` | Nome da entrada (padrão `devpulse`) |
 | `--advanced` | Pergunta também as opções avançadas |
 | `--force` | Substitui entradas existentes sem perguntar |
@@ -284,21 +340,25 @@ Antes de qualquer escrita, o assistente mostra o que vai fazer. O Claude Desktop
 ## Estrutura do código
 
 ```
-main.go                          # serve | -check | -version | install | uninstall | detect
+main.go                          # serve | -check | -version | install | uninstall | detect | update
+install.sh, install.ps1          # instalação em uma linha (baixa a release, confere o SHA256, roda o install)
 internal/mcp/                    # servidor MCP (JSON-RPC sobre stdio) e helpers de schema
 internal/httpx/                  # cliente HTTPS: sem redirect, limite de resposta, token removido dos erros
 internal/settings/               # leitura/validação de variáveis e arquivos de segredo
 internal/provider/               # contratos Provider / Component / Setting e a ativação
 internal/providers/registry.go   # lista de providers desta versão
 internal/providers/azuredevops/  # provider Azure DevOps: componentes Boards e 7pace
-internal/install/                # instalador: harnesses, apps, edição de config, prompts
+internal/install/                # instalador: harnesses, apps, edição de config, prompts, PATH e update
+internal/release/                # releases do GitHub: consulta, download, SHA256 e extração (devpulse update)
 .github/workflows/release.yml    # build e publicação das releases a cada tag vX.Y.Z
 ```
 
 ## Adicionando um provider
 
 1. Crie `internal/providers/<nome>/` com uma função que devolva um `provider.Provider`, com um `provider.Component` para cada módulo. Cada componente declara:
-   - `Settings`: as variáveis que ele lê, com rótulo, ajuda, tipo (`String`, `URL`, `SecretFile`, `Bool`, `Duration`), se é obrigatória ou avançada, o valor padrão e a **mesma** função de validação usada pelo servidor. O instalador monta as perguntas a partir disso. Opcionalmente, `Guide` traz um passo a passo de onde obter o valor, e os passos podem citar respostas anteriores como `{VARIAVEL|alternativa}`. Nos tokens, o guia só aparece quando o arquivo ainda precisa ser criado.
+   - `Settings`: as variáveis que ele lê, com rótulo, ajuda, tipo (`String`, `URL`, `SecretFile`, `Bool`, `Duration`), se é obrigatória ou avançada, o valor padrão e a **mesma** função de validação usada pelo servidor. O instalador monta as perguntas a partir disso. Opcionalmente, `Guide` traz um passo a passo de onde obter o valor, e os passos podem citar respostas anteriores como `{VARIAVEL|alternativa}`. `Guide.Show` diz quando o guia aparece:
+     - `provider.GuideWhenNeeded` (padrão): nos campos comuns, antes da pergunta. Nos tokens, só depois de a pessoa informar o caminho e só se o arquivo ainda precisa ser criado.
+     - `provider.GuideAlways`: sempre antes da pergunta, mesmo que o arquivo já exista. É o que usam o PAT do Azure DevOps e o token do 7pace.
    - `Enabled`: quando o ambiente liga o componente.
    - `Build`: cria a instância. `bc.Get("<provider>.<componente>")` dá acesso a componentes construídos antes.
    - `Instructions`: regras que entram nas instructions do servidor MCP.
@@ -316,11 +376,12 @@ go test -race ./...
 
 Os testes não acessam a rede:
 - **Servidor e providers**: usam servidores 7pace e Azure DevOps falsos (`httptest`). Verificam payloads, parâmetros da API, PATCH, bloqueio de duplicidade, validação de lote, bloqueio de redirect, remoção do token de mensagens de erro, limite de tamanho de resposta, escape de WIQL, configuração e ativação dos componentes.
-- **Instalador**: roda em diretórios temporários com comandos externos simulados. Cobre a edição de JSON (preserva chaves e ordem, faz backup, é idempotente, recusa JSON com comentários), os caminhos por sistema (incluindo o Claude Desktop MSIX), o uso seguro do CLI `claude`, os fluxos interativo e não interativo, o dry-run, a migração da entrada `7pace` e a gravação do token.
+- **Instalador**: roda em diretórios temporários com comandos externos simulados. Cobre a edição de JSON (preserva chaves e ordem, faz backup, é idempotente, recusa JSON com comentários), os caminhos por sistema (incluindo o Claude Desktop MSIX), o uso seguro do CLI `claude`, os fluxos interativo e não interativo, o dry-run, a migração da entrada `7pace`, a gravação do token, a ordem dos guias, o PATH (sem duplicar a linha e sem mexer no sistema real) e o `update`: troca do executável, `.old`, recusa quando o novo não roda, `--check` e `--dry-run`.
+- **Releases**: usam uma API do GitHub falsa (`httptest` com TLS). Cobrem o download conferido pelo SHA256, a recusa de hash errado, o bloqueio de http e de redirecionamento para outros hosts, a extração de zip e tar.gz e a comparação de versões.
 
 ## Versões e releases
 
-O projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) e ainda está na série `0.x`: enquanto não chegar à `1.0.0`, uma versão MINOR (`0.1` → `0.2`) pode trazer mudanças incompatíveis, sempre descritas no [CHANGELOG](CHANGELOG.md). `devpulse -version` mostra a versão instalada.
+O projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) e ainda está na série `0.x`: enquanto não chegar à `1.0.0`, uma versão MINOR (`0.1` → `0.2`) pode trazer mudanças incompatíveis, sempre descritas no [CHANGELOG](CHANGELOG.md). `devpulse -version` mostra a versão instalada, e `devpulse update --check` diz se há uma mais nova.
 
 Para publicar uma versão:
 
@@ -328,7 +389,7 @@ Para publicar uma versão:
 2. Faça o commit e crie a tag anotada: `git tag -a vX.Y.Z -m "vX.Y.Z"`.
 3. Envie: `git push origin main vX.Y.Z`.
 
-O workflow [`release.yml`](.github/workflows/release.yml) roda os testes, compila para Windows, macOS e Linux (amd64 e arm64) com a versão embutida, gera o `SHA256SUMS.txt`, o atestado de proveniência e publica a release com as notas do CHANGELOG. Tags com sufixo (`v0.2.0-rc.1`) viram pre-release.
+O workflow [`release.yml`](.github/workflows/release.yml) roda os testes, compila para Windows, macOS e Linux (amd64 e arm64) com a versão embutida, anexa o `install.sh` e o `install.ps1`, gera o `SHA256SUMS.txt`, o atestado de proveniência e publica a release com as notas do CHANGELOG. O `devpulse update` usa essas notas, o `SHA256SUMS.txt` e os nomes dos arquivos (`devpulse_<versão>_<os>_<arch>.zip|.tar.gz`). Por isso, não mude esse formato sem atualizar o `internal/release`. Tags com sufixo (`v0.2.0-rc.1`) viram pre-release.
 
 ## Limitações
 

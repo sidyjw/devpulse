@@ -1,0 +1,2 @@
+# O install.sh roda em `curl | sh`: um CR no fim da linha quebra o script.
+*.sh text eol=lf

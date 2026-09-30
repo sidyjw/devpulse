@@ -39,7 +39,7 @@ func isLegacy(name string) bool {
 // IsCommand reports whether arg is an installer subcommand.
 func IsCommand(arg string) bool {
 	switch arg {
-	case "install", "uninstall", "detect":
+	case "install", "uninstall", "detect", "update":
 		return true
 	}
 	return false
@@ -76,7 +76,9 @@ type options struct {
 	providerID, binDir                string
 	set                               setFlag
 	noCopy, advanced, yes, dryRun     bool
-	force, skipCheck                  bool
+	force, skipCheck, noPath          bool
+	checkOnly                         bool   // update --check
+	version                           string // update --version
 }
 
 // Run executes an installer subcommand and returns the exit code.
@@ -89,12 +91,14 @@ func run(ctx context.Context, args []string, b Build, e *Env, stdin io.Reader, s
 	o := &options{set: setFlag{}}
 	fs := flag.NewFlagSet(b.Name+" "+cmd, flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	if cmd != "detect" {
+	if cmd == "install" || cmd == "uninstall" {
 		fs.StringVar(&o.harness, "harness", "", "cliente de IA: "+harnessIDs())
 		fs.Var(&o.apps, "app", "apps da harness, separados por vírgula (ex.: code,desktop,cowork)")
 		fs.StringVar(&o.scope, "scope", "", "escopo do Claude Code: user, local ou project")
 		fs.StringVar(&o.config, "config", "", "grava neste arquivo JSON em vez do caminho padrão")
 		fs.StringVar(&o.key, "key", "", "caminho da chave dos servidores no JSON, separado por ponto (padrão: mcpServers)")
+	}
+	if cmd != "detect" {
 		fs.StringVar(&o.name, "name", b.Name, "nome da entrada do servidor")
 		fs.BoolVar(&o.yes, "yes", false, "aceita os padrões sem perguntar (modo não interativo)")
 		fs.BoolVar(&o.yes, "y", false, "o mesmo que --yes")
@@ -109,6 +113,12 @@ func run(ctx context.Context, args []string, b Build, e *Env, stdin io.Reader, s
 		fs.BoolVar(&o.advanced, "advanced", false, "pergunta também as opções avançadas")
 		fs.BoolVar(&o.force, "force", false, "substitui entradas existentes sem perguntar")
 		fs.BoolVar(&o.skipCheck, "skip-check", false, "não roda o -check antes de gravar")
+		fs.BoolVar(&o.noPath, "no-path", false, "não adiciona a pasta do executável ao PATH")
+	}
+	if cmd == "update" {
+		fs.BoolVar(&o.checkOnly, "check", false, "só informa se há versão nova, sem baixar")
+		fs.StringVar(&o.version, "version", "", "instala esta versão (ex.: 0.2.0) em vez da mais recente; serve também para voltar")
+		fs.BoolVar(&o.force, "force", false, "reinstala mesmo se já estiver na versão pedida")
 	}
 	if err := fs.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -131,6 +141,8 @@ func run(ctx context.Context, args []string, b Build, e *Env, stdin io.Reader, s
 		err = w.uninstall()
 	case "detect":
 		w.detect()
+	case "update":
+		err = w.update()
 	}
 	if err != nil {
 		if errors.Is(err, errAborted) {
