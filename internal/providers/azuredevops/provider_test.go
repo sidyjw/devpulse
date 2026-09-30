@@ -143,6 +143,48 @@ func TestActivation(t *testing.T) {
 	}
 }
 
+func TestReposActivation(t *testing.T) {
+	ps := []provider.Provider{Provider()}
+	hc := httpx.NewHTTPClient(time.Second)
+	m := map[string]string{"AZURE_DEVOPS_ORG_URL": "https://dev.azure.com/org", "AZURE_DEVOPS_PAT": "p", "AZURE_DEVOPS_REPOS": "true"}
+	act, instr, err := provider.Activate(ps, env(m), hc, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := mcp.NewServer("t", "0", instr)
+	var keys []string
+	for _, a := range act {
+		a.Instance.Register(s)
+		keys = append(keys, a.Key)
+	}
+	names := strings.Join(s.ToolNames(), ",")
+	if strings.Join(keys, ",") != "azuredevops.boards,azuredevops.repos" || !strings.Contains(names, "create_pull_request") || !strings.Contains(instr, "git remote get-url origin") {
+		t.Errorf("keys=%v tools=%s", keys, names)
+	}
+	for _, r := range act {
+		if ri, ok := r.Instance.(*reposInstance); ok && ri.az != act[0].Instance.(*boardsInstance).az {
+			t.Error("o Repos deveria usar o cliente do Boards")
+		}
+	}
+
+	m["AZURE_DEVOPS_REPOS_READ_ONLY"] = "true"
+	act, _, _ = provider.Activate(ps, env(m), hc, "")
+	s = mcp.NewServer("t", "0", "")
+	for _, a := range act {
+		a.Instance.Register(s)
+	}
+	if names := strings.Join(s.ToolNames(), ","); strings.Contains(names, "create_branch") || !strings.Contains(names, "create_work_item") {
+		t.Errorf("Repos somente leitura: %s", names)
+	}
+
+	if _, _, err := provider.Activate(ps, env(map[string]string{"AZURE_DEVOPS_REPOS": "true"}), hc, ""); err == nil || !strings.Contains(err.Error(), "AZURE_DEVOPS_ORG_URL") {
+		t.Errorf("Repos sem conexão deveria falhar: %v", err)
+	}
+	if act, _, _ := provider.Activate(ps, env(map[string]string{"AZURE_DEVOPS_ORG_URL": "https://dev.azure.com/org", "AZURE_DEVOPS_PAT": "p"}), hc, ""); len(act) != 1 {
+		t.Errorf("sem AZURE_DEVOPS_REPOS o Repos não deveria ligar: %v", act)
+	}
+}
+
 func TestSevenPaceUsesBoardsWhenAvailable(t *testing.T) {
 	m := map[string]string{"SEVENPACE_ORGANIZATION": "org", "SEVENPACE_TOKEN": "t",
 		"AZURE_DEVOPS_ORG_URL": "https://dev.azure.com/org", "AZURE_DEVOPS_PAT": "p"}

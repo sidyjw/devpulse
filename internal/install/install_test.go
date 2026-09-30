@@ -381,7 +381,7 @@ func TestInstallInteractive(t *testing.T) {
 		"",       // harness: Claude (detected)
 		"2",      // apps: only Claude Desktop
 		custom,   // user changes the config path
-		"9", "2", // components: invalid, then 7pace
+		"9", "3", // components: invalid, then 7pace
 		"org inválida", "minhaorg", // validation retries
 		tokFile, // token file
 		"",      // create from clipboard? yes
@@ -461,6 +461,39 @@ func TestSecretGuideShownWhenFileExists(t *testing.T) {
 		"--set", "AZURE_DEVOPS_PAT_FILE="+filepath.Join(e.Home, ".devpulse", "azdo-pat"))
 	if code != 0 || strings.Contains(out, title) {
 		t.Errorf("com --set e o arquivo existente o guia não deveria aparecer (%d):\n%s", code, out)
+	}
+}
+
+// Boards and Repos share the connection: it is asked once, and choosing
+// Repos only writes its flag.
+func TestSharedSettingsAskedOnce(t *testing.T) {
+	e, _ := fakeEnv(t, "linux")
+	writeFile(t, filepath.Join(e.Home, ".devpulse", "azdo-pat"), "segredo")
+	cfg := filepath.Join(e.XDGConfig, "Claude", "claude_desktop_config.json")
+	envOf := func() map[string]any {
+		return readJSON(t, cfg)["mcpServers"].(map[string]any)["devpulse"].(map[string]any)["env"].(map[string]any)
+	}
+	for _, comps := range []string{"boards,repos", "repos"} {
+		code, out := runCLI(t, e, "", "install", "--yes", "--force", "--harness", "claude", "--app", "desktop", "--no-copy", "--skip-check",
+			"--components", comps, "--set", "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/org")
+		if code != 0 {
+			t.Fatalf("%s: code=%d\n%s", comps, code, out)
+		}
+		if n := strings.Count(out, "Como gerar o PAT"); n != 1 {
+			t.Errorf("%s: guia do PAT apareceu %d vezes:\n%s", comps, n, out)
+		}
+		if !strings.Contains(out, "Code → Read & write") {
+			t.Errorf("%s: o guia deveria citar o escopo Code:\n%s", comps, out)
+		}
+		env := envOf()
+		if env["AZURE_DEVOPS_REPOS"] != "true" || env["AZURE_DEVOPS_ORG_URL"] != "https://dev.azure.com/org" || env["AZURE_DEVOPS_PAT_FILE"] == nil {
+			t.Errorf("%s: env = %v", comps, env)
+		}
+	}
+	code, out := runCLI(t, e, "", "install", "--yes", "--force", "--harness", "claude", "--app", "desktop", "--no-copy", "--skip-check",
+		"--components", "boards", "--set", "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/org")
+	if _, ok := envOf()["AZURE_DEVOPS_REPOS"]; code != 0 || ok {
+		t.Errorf("sem o Repos a flag não deveria ser gravada (%d):\n%s", code, out)
 	}
 }
 

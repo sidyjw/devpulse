@@ -6,6 +6,21 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+### Adicionado
+
+- Componente **Repos** no provider Azure DevOps, ligado com `AZURE_DEVOPS_REPOS=true` e usando a conexão do Boards:
+  - leitura: `list_repositories`, `get_repository`, `list_branches`, `get_branch_policies`, `list_pull_requests` e `get_pull_request` (revisores, work items, checks e threads);
+  - escrita: `create_branch`, `create_pull_request`, `update_pull_request` e `add_pull_request_comment`;
+  - `repository` aceita a URL do remoto (`git remote get-url origin`) e recusa remotos de outra organização;
+  - `AZURE_DEVOPS_REPOS_READ_ONLY` esconde as tools de escrita.
+- `session_time`: tempo desde o início da sessão (ou desde `since`) e as outras sessões do DevPulse no mesmo período, com a sobreposição, como sugestão para lançar horas. Os registros ficam em `~/.devpulse/sessions/`.
+- Tipo de variável `Flag` nos providers. Variáveis compartilhadas entre componentes são perguntadas uma vez só pelo instalador.
+
+### Alterado
+
+- O guia do PAT do Azure DevOps cita o escopo **Code**, necessário para o Repos.
+- No instalador, o 7pace passou a ser o componente 3 da lista (o Repos entrou como 2).
+
 ## [0.2.0] - 2026-09-30
 
 Quem está na 0.1.0 atualiza rodando de novo o script de instalação (ou baixando a release). A partir da 0.2.0, basta `devpulse update`.

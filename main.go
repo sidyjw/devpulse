@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/sidyjw/devpulse/internal/mcp"
 	"github.com/sidyjw/devpulse/internal/provider"
 	"github.com/sidyjw/devpulse/internal/providers"
+	"github.com/sidyjw/devpulse/internal/session"
 	"github.com/sidyjw/devpulse/internal/settings"
 )
 
@@ -90,14 +92,30 @@ func main() {
 	for _, a := range active {
 		a.Instance.Register(srv)
 	}
+	tracker := session.Start(sessionDir(), nil)
+	tracker.Register(srv)
 	mcp.Logf("v%s pronto (stdio). Tools: %s", version, strings.Join(srv.ToolNames(), ", "))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	trackCtx, stopTracking := context.WithCancel(ctx)
+	tracked := make(chan struct{})
+	go func() { tracker.Run(trackCtx); close(tracked) }()
+	defer func() { stopTracking(); <-tracked }() // records the end of the session
 	if err := srv.Serve(ctx, os.Stdin, os.Stdout); err != nil {
 		mcp.Logf("erro: %v", err)
 		os.Exit(1)
 	}
+}
+
+// sessionDir is where every devpulse process records its session, so each
+// one can see the others ("" keeps the session in memory only).
+func sessionDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".devpulse", "sessions")
 }
 
 func runCheck(active []provider.Active) int {
