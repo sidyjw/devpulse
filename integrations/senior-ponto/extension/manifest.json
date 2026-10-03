@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "DevPulse - Ponto Senior X",
+  "version": "0.1.0",
+  "description": "Copia suas marcações de ponto do Senior X para ~/.devpulse/ponto, para o DevPulse sugerir lançamentos de horas.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApuZLlBtVrESFhZzdS7veWfG0b0/WZo6kexvENW9lL6oRUCD+XIe830fFCxj6EINxgHN37pjFdISDZP8UMsDyjJaLsyBuRXsuqDtCiXPP911g8PeLLwEH5G/D5uzO8buEauJTKQdZRMG3mqUq0fkSzXGT31CK+I6bJcOvzbRKHNwPIkmRTlPXBqMVoVYVtKXPzlK/O52oBC6FnkPNuPxrAvuYKq4VsDOOKHBSMXoX8dbELUwU0ab/re7iqEW/3sjdQ3VxKhHjC/ziY1OZo57nN94R+oYcS6BpbNelOk4oTrHqgkbk11tTuRpAuUuWDtuCw3vcoewr5LF+6CBk6DAdVQIDAQAB",
+  "permissions": ["alarms", "cookies", "nativeMessaging", "notifications", "storage", "webRequest"],
+  "host_permissions": ["https://platform.senior.com.br/*", "https://senior.com.br/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "DevPulse - Ponto (clique para sincronizar)" },
+  "icons": { "128": "icon.png" }
+}

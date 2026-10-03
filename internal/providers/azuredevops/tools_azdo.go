@@ -238,6 +238,32 @@ func registerAzDOTools(s *mcp.Server, az *AzDO, cfg *boardsConfig) {
 		return az.WorkItemDetail(ctx, a.ID, withComments, a.AllFields)
 	})
 
+	s.AddTool(&mcp.Tool{
+		Name:  "get_work_item_updates",
+		Title: "Azure DevOps: histórico do item",
+		Description: "Revisões de um work item: quem mudou o quê e quando (estado, responsável, sprint, links, comentários…), " +
+			"com data e hora no fuso do usuário. Filtre por pessoa (changedBy) e período para saber o que alguém fez no item num dia. " +
+			"timeTrackingOnly=true marca revisões que só mexeram em Completed/Remaining Work, em geral escritas por um time tracker e não pela pessoa.",
+		InputSchema: mcp.Obj(map[string]any{
+			"id":        mcp.IntP("ID do work item"),
+			"changedBy": mcp.StrP("Opcional: \"me\", e-mail, nome ou ID de quem alterou"),
+			"startDate": mcp.StrP("Opcional: AAAA-MM-DD, no fuso do usuário (com só startDate, até hoje)"),
+			"endDate":   mcp.StrP("Opcional: AAAA-MM-DD (com só endDate, aquele dia; máx. 31 dias)"),
+		}, "id"),
+		Annotations: mcp.ReadOnly,
+	}, func(ctx context.Context, raw json.RawMessage) (any, error) {
+		var a struct {
+			ID        int    `json:"id"`
+			ChangedBy string `json:"changedBy"`
+			StartDate string `json:"startDate"`
+			EndDate   string `json:"endDate"`
+		}
+		if err := mcp.DecodeArgs(raw, &a); err != nil {
+			return nil, err
+		}
+		return az.WorkItemRevisions(ctx, WorkItemUpdatesFilter{ID: a.ID, ChangedBy: a.ChangedBy, StartDate: a.StartDate, EndDate: a.EndDate})
+	})
+
 	if cfg.ReadOnly {
 		return
 	}

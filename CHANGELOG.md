@@ -6,6 +6,17 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+## [0.4.0] - 2026-10-03
+
+### Adicionado
+
+- Tools de atividade no Azure DevOps, para usar como evidência ao propor lançamentos de horas. Todas são só leitura e trabalham com datas no fuso do usuário:
+  - `list_pushes` (Repos): pushes de uma pessoa num período, com branches e commits, em um repositório ou em todos os do projeto. Ignora as refs internas de PR e informa os repositórios sem permissão;
+  - `list_pull_request_activity` (Repos): PRs criadas, votos, comentários, novos commits e mudanças de status de uma pessoa num período, com os work items de cada PR;
+  - `get_work_item_updates` (Boards): revisões de um work item, filtráveis por pessoa e período, sem os campos internos. `timeTrackingOnly` marca as revisões que só mexeram em Completed/Remaining Work.
+- `get_punches`: marcações de ponto por dia, com intervalos e total trabalhado, lidas de `~/.devpulse/ponto/` (ou de `DEVPULSE_PONTO_DIR`).
+- `integrations/senior-ponto`: extensão do Edge/Chrome e host local em PowerShell (native messaging) que gravam as marcações do Senior X nessa pasta.
+
 ## [0.3.0] - 2026-09-30
 
 Quem está na 0.2.0 atualiza com `devpulse update`. Para usar o Repos, acrescente o escopo **Code** ao PAT do Azure DevOps e rode `devpulse install` de novo, escolhendo o componente Repos (ou defina `AZURE_DEVOPS_REPOS=true`).
@@ -59,7 +70,8 @@ Primeira release pública.
 - `devpulse -check` para validar a configuração e testar as conexões.
 - Binários para Windows, macOS e Linux (amd64 e arm64), com `SHA256SUMS.txt` e atestado de proveniência.
 
-[Não lançado]: https://github.com/sidyjw/devpulse/compare/v0.3.0...HEAD
+[Não lançado]: https://github.com/sidyjw/devpulse/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sidyjw/devpulse/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sidyjw/devpulse/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sidyjw/devpulse/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sidyjw/devpulse/releases/tag/v0.1.0

@@ -82,6 +82,7 @@ Bugs de API corrigidos, conforme a [documentação oficial da 7pace](https://git
 | `get_sprint_board` | Quadro da sprint por coluna/estado, com responsáveis e trabalho restante |
 | `query_work_items` | Busca por tipo, estado, responsável, sprint, área, pai, título, tag ou WIQL |
 | `get_work_item` | Detalhes: descrição, critérios de aceite, pai, filhos, links e comentários |
+| `get_work_item_updates` | Histórico de revisões: quem mudou o quê e quando, filtrável por pessoa e período. Marca as revisões que só mexeram em Completed/Remaining Work (`timeTrackingOnly`) |
 | `create_work_item` | Cria Epic, Feature, User Story, Task, Bug… já com pai e sprint |
 | `update_work_item` | Estado, responsável, sprint, estimativas, tags, pai, campos customizados |
 | `add_work_item_comment` | Comenta num item |
@@ -99,6 +100,8 @@ O Repos cobre o lado do servidor. Commits e push continuam com o `git` da sua m�
 | `get_branch_policies` | Políticas de uma branch (revisores, build, work item…) e se ela só aceita mudanças por PR |
 | `list_pull_requests` | PRs por status, autor, revisor e branches |
 | `get_pull_request` | Detalhes: revisores e votos, work items, checks das políticas e threads de comentários |
+| `list_pushes` | Pushes de uma pessoa num período, com as branches e os commits de cada um, num repositório ou em todos os do projeto. Mostra também o trabalho em branches ainda não mescladas |
+| `list_pull_request_activity` | O que uma pessoa fez em PRs num período: PRs criadas, votos, comentários, novos commits e mudanças de status, com os work items de cada PR |
 | `create_branch` | Cria uma branch remota a partir de outra branch ou de um commit, opcionalmente vinculada a um work item |
 | `create_pull_request` | Abre uma PR (ou um rascunho), com revisores, work items e tags |
 | `update_pull_request` | Título, descrição, rascunho/publicada, branch de destino, novos revisores e work items |
@@ -111,8 +114,13 @@ Excluir branches e completar ou abandonar PRs não são suportados. As regras de
 | Tool | O que faz |
 |---|---|
 | `session_time` | Tempo desde o início da sessão (ou desde um horário informado) e as outras sessões do DevPulse que rodaram no mesmo período, com a sobreposição. É uma **sugestão** para lançar horas: nada é lançado. |
+| `get_punches` | Marcações de ponto por dia, com os intervalos trabalhados e o total (o intervalo em aberto de hoje é contado até agora). Só lê arquivos locais: nada é consultado na rede. |
 
 Cada processo do DevPulse registra o próprio início num arquivo em `~/.devpulse/sessions/` e o atualiza a cada minuto. É assim que uma sessão enxerga as outras. No Claude Code, cada sessão tem o seu processo. Clientes que mantêm o servidor aberto entre conversas, como o Claude Desktop, devem informar `since`.
+
+`get_punches` lê os arquivos que uma integração de ponto grava em `~/.devpulse/ponto/` (ou em `DEVPULSE_PONTO_DIR`). Para o **Senior X**, a integração é uma extensão do Edge/Chrome com um host local em PowerShell: veja [integrations/senior-ponto](integrations/senior-ponto/README.md). Outra fonte de ponto pode gravar o mesmo formato: um `AAAA-MM-DD.json` por dia com `date`, `timeZone`, `punches` (`HH:MM:SS`), `source` e `syncedAt`.
+
+As datas das tools de atividade (`list_pushes`, `list_pull_request_activity`, `get_work_item_updates`) entram e saem no fuso do usuário. O Azure DevOps responde em UTC, o que jogaria o fim da tarde no dia seguinte.
 
 ---
 
@@ -354,6 +362,7 @@ O Repos usa a conexão do Boards (`AZURE_DEVOPS_ORG_URL`, o PAT e o projeto padr
 | Variável | Obrigatória | Descrição |
 |---|---|---|
 | `DEVPULSE_HTTP_TIMEOUT` | não | Tempo limite por requisição (padrão `30s`, máx. `5m`). Os nomes antigos `PM_MCP_HTTP_TIMEOUT` e `SEVENPACE_HTTP_TIMEOUT` continuam aceitos. |
+| `DEVPULSE_PONTO_DIR` | não | Pasta das marcações de ponto lidas por `get_punches` (padrão `~/.devpulse/ponto`) |
 
 ## Migrando do pm-mcp ou do 7pace-mcp
 
@@ -423,7 +432,8 @@ go test -race ./...
 ```
 
 Os testes não acessam a rede:
-- **Servidor e providers**: usam servidores 7pace e Azure DevOps falsos (`httptest`). Verificam payloads, parâmetros da API, PATCH, bloqueio de duplicidade, validação de lote, bloqueio de redirect, remoção do token de mensagens de erro, limite de tamanho de resposta, escape de WIQL, configuração e ativação dos componentes. No Repos: leitura da URL do remoto (e recusa de outras organizações), validação de nomes de branch, criação de branch e de PR, vínculo com work items e mensagens de erro do Azure DevOps.
+- **Servidor e providers**: usam servidores 7pace e Azure DevOps falsos (`httptest`). Verificam payloads, parâmetros da API, PATCH, bloqueio de duplicidade, validação de lote, bloqueio de redirect, remoção do token de mensagens de erro, limite de tamanho de resposta, escape de WIQL, configuração e ativação dos componentes. No Repos: leitura da URL do remoto (e recusa de outras organizações), validação de nomes de branch, criação de branch e de PR, vínculo com work items e mensagens de erro do Azure DevOps. Nas tools de atividade: filtro por pessoa e período (sem confiar só no filtro do servidor), repositórios desativados ou sem permissão, refs internas de PR, votos e comentários por autor, campos internos e revisões só de time tracking.
+- **Ponto**: relógio simulado e diretório temporário. Cobrem batidas fora de ordem e com segundos, arquivo com BOM, intervalo em aberto hoje (contado até agora) e em dia passado, dia sem batidas, dia não sincronizado, arquivo inválido ou com a data trocada, sincronização atrasada e os limites do período.
 - **Sessões**: relógio simulado e diretório temporário. Cobrem a sobreposição com sessões ativas, encerradas e interrompidas (sem contar a mesma hora duas vezes), o `since` e a limpeza dos registros antigos.
 - **Instalador**: roda em diretórios temporários com comandos externos simulados. Cobre a edição de JSON (preserva chaves e ordem, faz backup, é idempotente, recusa JSON com comentários), os caminhos por sistema (incluindo o Claude Desktop MSIX), o uso seguro do CLI `claude`, os fluxos interativo e não interativo, o dry-run, a migração da entrada `7pace`, a gravação do token, a ordem dos guias, o PATH (sem duplicar a linha e sem mexer no sistema real) e o `update`: troca do executável, `.old`, recusa quando o novo não roda, `--check` e `--dry-run`.
 - **Releases**: usam uma API do GitHub falsa (`httptest` com TLS). Cobrem o download conferido pelo SHA256, a recusa de hash errado, o bloqueio de http e de redirecionamento para outros hosts, a extração de zip e tar.gz e a comparação de versões.

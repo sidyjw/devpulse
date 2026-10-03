@@ -163,6 +163,80 @@ func registerReposTools(s *mcp.Server, az *AzDO, cfg *reposConfig) {
 		return az.PullRequestDetail(ctx, a.Project, a.ID, a.IncludeComments == nil || *a.IncludeComments)
 	})
 
+	periodP := map[string]any{
+		"startDate": mcp.StrP("AAAA-MM-DD, no fuso do usuário (padrão: hoje)"),
+		"endDate":   mcp.StrP("AAAA-MM-DD (padrão: hoje; com só endDate, aquele dia; máx. 31 dias)"),
+	}
+
+	s.AddTool(&mcp.Tool{
+		Name:  "list_pushes",
+		Title: "Azure Repos: pushes",
+		Description: "Pushes (envios ao servidor) de uma pessoa num período, com as branches atualizadas e os commits de cada um. " +
+			"Sem repository, procura em todos os repositórios ativos do projeto. Diferente do histórico de commits, mostra " +
+			"também o trabalho em branches ainda não mescladas. Datas no fuso do usuário; a data de cada commit é a de autoria, e o push " +
+			"de uma branch nova pode trazer commits de dias anteriores. Útil como evidência ao propor lançamentos de horas.",
+		InputSchema: mcp.Obj(map[string]any{
+			"project":    projectP,
+			"repository": mcp.StrP("Opcional: nome, ID ou URL do remoto; sem ele, todos os repositórios do projeto"),
+			"pushedBy":   mcp.StrP("\"me\" (padrão), e-mail, nome ou ID"),
+			"startDate":  periodP["startDate"],
+			"endDate":    periodP["endDate"],
+			"commits":    mcp.BoolP("Incluir os commits de cada push (padrão true; até 20 por push)"),
+			"top":        mcp.IntP("Máximo de pushes (padrão 50, máx. 200)"),
+		}),
+		Annotations: mcp.ReadOnly,
+	}, func(ctx context.Context, raw json.RawMessage) (any, error) {
+		var a struct {
+			Project    string `json:"project"`
+			Repository string `json:"repository"`
+			PushedBy   string `json:"pushedBy"`
+			StartDate  string `json:"startDate"`
+			EndDate    string `json:"endDate"`
+			Commits    *bool  `json:"commits"`
+			Top        int    `json:"top"`
+		}
+		if err := mcp.DecodeArgs(raw, &a); err != nil {
+			return nil, err
+		}
+		return az.Pushes(ctx, PushFilter{
+			Project: a.Project, Repository: a.Repository, PushedBy: a.PushedBy, StartDate: a.StartDate,
+			EndDate: a.EndDate, Top: a.Top, Commits: a.Commits == nil || *a.Commits,
+		})
+	})
+
+	s.AddTool(&mcp.Tool{
+		Name:  "list_pull_request_activity",
+		Title: "Azure Repos: atividade em PRs",
+		Description: "O que uma pessoa fez em pull requests num período: PRs que criou, votos (aprovação, rejeição…), " +
+			"comentários, novos commits e mudanças de status, com data e hora no fuso do usuário e os work items de cada PR. " +
+			"Considera as PRs que a pessoa criou ou revisa abertas até lookbackDays antes do período. Útil para lançar code review no dia certo.",
+		InputSchema: mcp.Obj(map[string]any{
+			"project":      projectP,
+			"user":         mcp.StrP("\"me\" (padrão), e-mail, nome ou ID"),
+			"startDate":    periodP["startDate"],
+			"endDate":      periodP["endDate"],
+			"lookbackDays": mcp.IntP("Considera PRs criadas até N dias antes de startDate (padrão 30, máx. 90)"),
+			"top":          mcp.IntP("Máximo de PRs por lista, criadas e revisadas (padrão 100, máx. 200)"),
+		}),
+		Annotations: mcp.ReadOnly,
+	}, func(ctx context.Context, raw json.RawMessage) (any, error) {
+		var a struct {
+			Project      string `json:"project"`
+			User         string `json:"user"`
+			StartDate    string `json:"startDate"`
+			EndDate      string `json:"endDate"`
+			LookbackDays int    `json:"lookbackDays"`
+			Top          int    `json:"top"`
+		}
+		if err := mcp.DecodeArgs(raw, &a); err != nil {
+			return nil, err
+		}
+		return az.PullRequestActivity(ctx, PRActivityFilter{
+			Project: a.Project, User: a.User, StartDate: a.StartDate, EndDate: a.EndDate,
+			LookbackDays: a.LookbackDays, Top: a.Top,
+		})
+	})
+
 	if cfg.ReadOnly {
 		return
 	}

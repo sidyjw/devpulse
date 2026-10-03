@@ -500,6 +500,7 @@ type rawPR struct {
 	ClosedDate    string `json:"closedDate"`
 	MergeStatus   string `json:"mergeStatus"`
 	CreatedBy     struct {
+		ID          string `json:"id"`
 		DisplayName string `json:"displayName"`
 	} `json:"createdBy"`
 	AutoCompleteSetBy *struct {
@@ -563,6 +564,18 @@ type PRFilter struct {
 }
 
 func (a *AzDO) PullRequests(ctx context.Context, f PRFilter) ([]PullRequest, error) {
+	raw, err := a.rawPullRequests(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]PullRequest, len(raw))
+	for i, r := range raw {
+		out[i] = a.pr(r)
+	}
+	return out, nil
+}
+
+func (a *AzDO) rawPullRequests(ctx context.Context, f PRFilter) ([]rawPR, error) {
 	q := url.Values{}
 	status := strings.ToLower(strings.TrimSpace(f.Status))
 	switch status {
@@ -623,11 +636,7 @@ func (a *AzDO) PullRequests(ctx context.Context, f PRFilter) ([]PullRequest, err
 	if err := a.gitDo(ctx, http.MethodGet, p+q.Encode(), nil, &res); err != nil {
 		return nil, err
 	}
-	out := make([]PullRequest, len(res.Value))
-	for i, r := range res.Value {
-		out[i] = a.pr(r)
-	}
-	return out, nil
+	return res.Value, nil
 }
 
 // identityID accepts "me" or an identity ID (GUID); searches by name need a
