@@ -6,6 +6,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+## [0.4.0] - 2026-10-03
+
 ### Adicionado
 
 - Tools de atividade no Azure DevOps, para usar como evidência ao propor lançamentos de horas. Todas são só leitura e trabalham com datas no fuso do usuário:
@@ -68,7 +70,8 @@ Primeira release pública.
 - `devpulse -check` para validar a configuração e testar as conexões.
 - Binários para Windows, macOS e Linux (amd64 e arm64), com `SHA256SUMS.txt` e atestado de proveniência.
 
-[Não lançado]: https://github.com/sidyjw/devpulse/compare/v0.3.0...HEAD
+[Não lançado]: https://github.com/sidyjw/devpulse/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sidyjw/devpulse/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sidyjw/devpulse/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sidyjw/devpulse/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sidyjw/devpulse/releases/tag/v0.1.0
