@@ -1,2 +1,6 @@
 # O install.sh roda em `curl | sh`: um CR no fim da linha quebra o script.
 *.sh text eol=lf
+
+# Scripts do Windows: o cmd.exe e o PowerShell 5.1 esperam CRLF.
+integrations/**/*.cmd text eol=crlf
+integrations/**/*.ps1 text eol=crlf

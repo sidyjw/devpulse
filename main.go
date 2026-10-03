@@ -25,6 +25,7 @@ import (
 	"github.com/sidyjw/devpulse/internal/httpx"
 	"github.com/sidyjw/devpulse/internal/install"
 	"github.com/sidyjw/devpulse/internal/mcp"
+	"github.com/sidyjw/devpulse/internal/ponto"
 	"github.com/sidyjw/devpulse/internal/provider"
 	"github.com/sidyjw/devpulse/internal/providers"
 	"github.com/sidyjw/devpulse/internal/session"
@@ -94,6 +95,7 @@ func main() {
 	}
 	tracker := session.Start(sessionDir(), nil)
 	tracker.Register(srv)
+	ponto.New(pontoDir(), nil).Register(srv)
 	mcp.Logf("v%s pronto (stdio). Tools: %s", version, strings.Join(srv.ToolNames(), ", "))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -116,6 +118,19 @@ func sessionDir() string {
 		return ""
 	}
 	return filepath.Join(home, ".devpulse", "sessions")
+}
+
+// pontoDir is where a punch-clock integration writes one file per day
+// (DEVPULSE_PONTO_DIR or ~/.devpulse/ponto; "" when the home is unknown).
+func pontoDir() string {
+	if d := strings.TrimSpace(os.Getenv("DEVPULSE_PONTO_DIR")); d != "" {
+		return d
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".devpulse", "ponto")
 }
 
 func runCheck(active []provider.Active) int {
